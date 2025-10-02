@@ -1,0 +1,13 @@
+{
+  "default_locale": "en",
+  "translations": {
+    "en": {
+      "home.title": "Welcome",
+      "home.tagline": "Your place on the web"
+    },
+    "es": {
+      "home.title": "Bienvenido",
+      "home.tagline": "Tu lugar en la web"
+    }
+  }
+}

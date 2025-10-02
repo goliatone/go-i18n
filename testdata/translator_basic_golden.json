@@ -1,0 +1,10 @@
+{
+  "lookups": [
+    {"locale": "en", "key": "home.title", "args": [], "want": "Welcome"},
+    {"locale": "es", "key": "home.title", "args": [], "want": "Bienvenido"},
+    {"locale": "",   "key": "home.tagline", "args": [], "want": "Your place on the web"}
+  ],
+  "missing": [
+    {"locale": "en", "key": "home.missing"}
+  ]
+}
