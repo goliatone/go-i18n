@@ -135,3 +135,37 @@ func TestConfigBuildTranslatorNil(t *testing.T) {
 		t.Fatalf("expected ErrNotImplemented, got (%v, %v)", err, translator)
 	}
 }
+
+func TestBuildTranslatorAppliesHooks(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {"home.title": "Welcome"},
+	})
+
+	var before, after int
+	hook := TranslationHookFuncs{
+		Before: func(locale, key string, args []any) { before++ },
+		After:  func(locale, key string, args []any, result string, err error) { after++ },
+	}
+
+	cfg, err := NewConfig(
+		WithStore(store),
+		WithDefaultLocale("en"),
+		WithTranslatorHooks(hook),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	translator, err := cfg.BuildTranslator()
+	if err != nil {
+		t.Fatalf("BuildTranslator: %v", err)
+	}
+
+	if _, err := translator.Translate("en", "home.title"); err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if before != 1 || after != 1 {
+		t.Fatalf("expected hook counts 1/1, got %d/%d", before, after)
+	}
+}
