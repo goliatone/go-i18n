@@ -77,7 +77,7 @@ func FormatMeasurement(locale string, value float64, unit string) string {
 func ordinalSuffic(value int) string {
 	abs := value
 	if abs < 0 {
-		abs = -1
+		abs = -abs
 	}
 	mod100 := abs % 100
 	if mod100 >= 11 && mod100 <= 13 {
