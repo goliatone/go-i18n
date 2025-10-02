@@ -43,7 +43,7 @@ func NewConfig(opts ...Option) (*Config, error) {
 	}
 
 	if cfg.Resolver == nil {
-		cfg.Resolver = StaticFallbackResolver{}
+		cfg.Resolver = NewStaticFallbackResolver()
 	}
 
 	if cfg.Formatter == nil {
@@ -94,6 +94,24 @@ func WithFallbackResolver(resolver FallbackResolver) Option {
 	}
 }
 
+func WithFallback(locale string, fallbacks ...string) Option {
+	return func(c *Config) error {
+		if locale == "" {
+			return nil
+		}
+		resolver, ok := c.Resolver.(*StaticFallbackResolver)
+		if !ok {
+			if c.Resolver != nil {
+				return nil
+			}
+			resolver = NewStaticFallbackResolver()
+			c.Resolver = resolver
+		}
+		resolver.Set(locale, fallbacks...)
+		return nil
+	}
+}
+
 func WithFormatter(formatter Formatter) Option {
 	return func(c *Config) error {
 		c.Formatter = formatter
@@ -108,7 +126,8 @@ func (cfg *Config) BuildTranslator() (*SimpleTranslator, error) {
 
 	translator, err := NewSimpleTranslator(cfg.Store,
 		WithTranslatorDefaultLocale(cfg.DefaultLocale),
-		WithTranslatorFormatter(cfg.Formatter))
+		WithTranslatorFormatter(cfg.Formatter),
+		WithTranslatorFallbackResolver(cfg.Resolver))
 	if err != nil {
 		return nil, err
 	}
