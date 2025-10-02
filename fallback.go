@@ -5,13 +5,11 @@ type FallbackResolver interface {
 	Resolve(locale string) []string
 }
 
+var _ FallbackResolver = &StaticFallbackResolver{}
+
 // StaticFallbackResolver initial imp
 type StaticFallbackResolver struct {
 	chains map[string][]string
-}
-
-func (s StaticFallbackResolver) Resolve(locale string) []string {
-	return nil
 }
 
 func NewStaticFallbackResolver() *StaticFallbackResolver {
@@ -46,7 +44,7 @@ func (r *StaticFallbackResolver) Set(locale string, fallbacks ...string) {
 }
 
 // Resolve returns a copy of the fallback chain for a locale
-func (r *StaticFallbackResolver) Resolver(locale string) []string {
+func (r *StaticFallbackResolver) Resolve(locale string) []string {
 	if r == nil || r.chains == nil {
 		return nil
 	}
