@@ -1,0 +1,14 @@
+{
+  "default_locale": "en",
+  "fallbacks": {
+    "fr": ["es", "en"],
+    "es": ["en"]
+  },
+  "translations": {
+    "en": {
+      "home.title": "Welcome",
+      "home.tagline": "Your place on the web"
+    },
+    "es": {}
+  }
+}
