@@ -10,6 +10,7 @@ type Config struct {
 	Store         Store
 	Resolver      FallbackResolver
 	Formatter     Formatter
+	Hooks         []TranslationHook
 }
 
 // Option mutates Config during construction
@@ -119,6 +120,18 @@ func WithFormatter(formatter Formatter) Option {
 	}
 }
 
+func WithTranslatorHooks(hooks ...TranslationHook) Option {
+	return func(c *Config) error {
+		for _, hook := range hooks {
+			if hook == nil {
+				continue
+			}
+			c.Hooks = append(c.Hooks, hook)
+		}
+		return nil
+	}
+}
+
 func (cfg *Config) BuildTranslator() (*SimpleTranslator, error) {
 	if cfg == nil {
 		return nil, ErrNotImplemented
@@ -130,6 +143,10 @@ func (cfg *Config) BuildTranslator() (*SimpleTranslator, error) {
 		WithTranslatorFallbackResolver(cfg.Resolver))
 	if err != nil {
 		return nil, err
+	}
+
+	if len(cfg.Hooks) > 0 {
+		translator = WrapTranslatorWithHooks(translator, cfg.Hooks...)
 	}
 
 	return translator, nil
