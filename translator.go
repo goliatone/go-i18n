@@ -31,12 +31,14 @@ type SimpleTranslator struct {
 	store         Store
 	defaultLocale string
 	formatter     Formatter
+	resolver      FallbackResolver
 }
 
 func NewSimpleTranslator(store Store, opts ...SimpleTranslatorOption) (*SimpleTranslator, error) {
 	st := &SimpleTranslator{
 		store:     store,
 		formatter: FormatterFunc(sprintfFormatter),
+		resolver:  NewStaticFallbackResolver(),
 	}
 
 	if st.store == nil {
@@ -51,6 +53,10 @@ func NewSimpleTranslator(store Store, opts ...SimpleTranslatorOption) (*SimpleTr
 
 	if st.formatter == nil {
 		st.formatter = FormatterFunc(sprintfFormatter)
+	}
+
+	if st.resolver == nil {
+		st.resolver = NewStaticFallbackResolver()
 	}
 
 	return st, nil
@@ -68,34 +74,75 @@ func WithTranslatorFormatter(formatter Formatter) SimpleTranslatorOption {
 	}
 }
 
+func WithTranslatorFallbackResolver(resolver FallbackResolver) SimpleTranslatorOption {
+	return func(st *SimpleTranslator) {
+		st.resolver = resolver
+	}
+}
+
 func (t *SimpleTranslator) Translate(locale, key string, args ...any) (string, error) {
 	if t == nil {
 		return "", ErrMissingTranslation
 	}
 
-	loc := locale
-	if loc == "" {
-		loc = t.defaultLocale
-	}
-
-	if key == "" || loc == "" {
+	if key == "" {
 		return "", ErrMissingTranslation
 	}
 
-	msg, ok := t.store.Get(loc, key)
-	if !ok {
+	primary := locale
+	if primary == "" {
+		primary = t.defaultLocale
+	}
+
+	if primary == "" {
 		return "", ErrMissingTranslation
 	}
 
-	if len(args) == 0 || t.formatter == nil {
-		return msg, nil
+	for _, candidate := range t.lookupLocales(primary) {
+		if msg, ok := t.store.Get(candidate, key); ok {
+			if len(args) == 0 || t.formatter == nil {
+				return msg, nil
+			}
+
+			formatted, err := t.formatter.Format(msg, args...)
+			if err != nil {
+				return "", err
+			}
+
+			return formatted, nil
+		}
 	}
 
-	formatted, err := t.formatter.Format(msg, args...)
-	if err != nil {
-		return "", err
+	return "", ErrMissingTranslation
+}
+
+func (t *SimpleTranslator) lookupLocales(primary string) []string {
+	order := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 4)
+
+	appendLocale := func(locale string) {
+		if locale == "" {
+			return
+		}
+
+		if _, ok := seen[locale]; ok {
+			return
+		}
+		seen[locale] = struct{}{}
+		order = append(order, locale)
 	}
-	return formatted, nil
+
+	appendLocale(primary)
+
+	if t.resolver != nil {
+		for _, fb := range t.resolver.Resolve(primary) {
+			appendLocale(fb)
+		}
+	}
+
+	appendLocale(t.defaultLocale)
+
+	return order
 }
 
 func sprintfFormatter(template string, args ...any) (string, error) {
