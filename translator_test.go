@@ -113,3 +113,55 @@ func TestSimpleTranslatorCustomFormatter(t *testing.T) {
 		t.Fatal("expected formatter to be invoked")
 	}
 }
+
+func TestSimpleTranslatorFallbackChain(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {
+			"home.title": "Welcome",
+		},
+	})
+
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("es", "en")
+
+	translator, err := NewSimpleTranslator(store,
+		WithTranslatorDefaultLocale("en"),
+		WithTranslatorFallbackResolver(resolver),
+	)
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	got, err := translator.Translate("es", "home.title")
+	if err != nil {
+		t.Fatalf("Translate with fallback: %v", err)
+	}
+
+	if got != "Welcome" {
+		t.Fatalf("Translate fallback = %q want Welcome", got)
+	}
+}
+
+func TestSimpleTranslatorFallbackMiss(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {
+			"home.title": "Welcome",
+		},
+	})
+
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("es", "fr")
+
+	translator, err := NewSimpleTranslator(store,
+		WithTranslatorDefaultLocale("en"),
+		WithTranslatorFallbackResolver(resolver),
+	)
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	_, err = translator.Translate("es", "unknown")
+	if err != ErrMissingTranslation {
+		t.Fatalf("expected ErrMissingTranslation, got %v", err)
+	}
+}

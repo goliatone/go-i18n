@@ -56,6 +56,28 @@ func TestNewConfigWithLoader(t *testing.T) {
 	}
 }
 
+func TestConfigWithFallbackOption(t *testing.T) {
+	cfg, err := NewConfig(
+		WithFallback("es", "en", "fr", "en"),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	chain := cfg.Resolver.Resolve("es")
+
+	expected := []string{"en", "fr"}
+	if len(chain) != len(expected) {
+		t.Fatalf("fallback chain length = %d want %d", len(chain), len(expected))
+	}
+
+	for i, locale := range expected {
+		if chain[i] != locale {
+			t.Fatalf("fallback[%d] = %q want %q", i, chain[i], locale)
+		}
+	}
+}
+
 func TestBuildTranslator(t *testing.T) {
 	cfg, err := NewConfig(
 		WithLocales("en"),
@@ -74,6 +96,35 @@ func TestBuildTranslator(t *testing.T) {
 
 	if translator == nil {
 		t.Fatal("expected translator instance")
+	}
+}
+
+func TestBuildTranslatorUsesFallback(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {"home.title": "Welcome"},
+	})
+
+	cfg, err := NewConfig(
+		WithStore(store),
+		WithDefaultLocale("en"),
+		WithFallback("es", "en"),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	translator, err := cfg.BuildTranslator()
+	if err != nil {
+		t.Fatalf("BuildTranslator: %v", err)
+	}
+
+	got, err := translator.Translate("es", "home.title")
+	if err != nil {
+		t.Fatalf("Translate with fallback: %v", err)
+	}
+
+	if got != "Welcome" {
+		t.Fatalf("Translate() = %q want Welcome", got)
 	}
 }
 
