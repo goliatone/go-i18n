@@ -132,18 +132,20 @@ func WithTranslatorHooks(hooks ...TranslationHook) Option {
 	}
 }
 
-func (cfg *Config) BuildTranslator() (*SimpleTranslator, error) {
+func (cfg *Config) BuildTranslator() (Translator, error) {
 	if cfg == nil {
 		return nil, ErrNotImplemented
 	}
 
-	translator, err := NewSimpleTranslator(cfg.Store,
+	base, err := NewSimpleTranslator(cfg.Store,
 		WithTranslatorDefaultLocale(cfg.DefaultLocale),
 		WithTranslatorFormatter(cfg.Formatter),
 		WithTranslatorFallbackResolver(cfg.Resolver))
 	if err != nil {
 		return nil, err
 	}
+
+	var translator Translator = base
 
 	if len(cfg.Hooks) > 0 {
 		translator = WrapTranslatorWithHooks(translator, cfg.Hooks...)
