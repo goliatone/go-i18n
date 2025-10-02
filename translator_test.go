@@ -1,84 +1,115 @@
 package i18n
 
-import (
-	"encoding/json"
-	"errors"
-	"os"
-	"testing"
-)
+import "testing"
 
-type translatorFixture struct {
-	DefaultLocale string                       `json:"default_locale"`
-	Translations  map[string]map[string]string `json:"translations"`
-}
+func TestSimpleTranslatorTranslate(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {
+			"home.title":    "Welcome",
+			"home.greeting": "Hello %s",
+		},
+		"es": {
+			"home.title": "Bienvenido",
+		},
+	})
 
-type translatorGolden struct {
-	Lookups []struct {
-		Locale string `json:"locale"`
-		Key    string `json:"key"`
-		Args   []any  `json:"args"`
-		Want   string `json:"want"`
-	} `json:"lookups"`
-	Missing []struct {
-		Locale string `json:"locale"`
-		Key    string `json:"key"`
-	} `json:"missing"`
-}
-
-func TestTranslatorContract_BasicFixture(t *testing.T) {
-	t.Skip("pending translator implementation")
-
-	fixture := loadTranslatorFixture(t, "testdata/translator_basic_fixture.json")
-	golden := loadTranslatorGolden(t, "testdata/translator_basic_golden.json")
-
-	translator := newContractTranslator(t, fixture)
-
-	for _, tc := range golden.Lookups {
-		got, err := translator.Translate(tc.Locale, tc.Key, tc.Args...)
-		if err != nil {
-			t.Fatalf("Translate(%q,%q): unexpected err: %v", tc.Locale, tc.Key, err)
-		}
-		if got != tc.Want {
-			t.Fatalf("Translate(%q,%q) = %q want %q", tc.Locale, tc.Key, got, tc.Want)
-		}
-	}
-
-	for _, tc := range golden.Missing {
-		_, err := translator.Translate(tc.Locale, tc.Key)
-		if !errors.Is(err, ErrMissingTranslation) {
-			t.Fatalf("missing Translate(%q,%q) err = %v want ErrMissingTranslation", tc.Locale, tc.Key, err)
-		}
-	}
-}
-
-func loadTranslatorFixture(t *testing.T, path string) translatorFixture {
-	t.Helper()
-	data, err := os.ReadFile(path)
+	translator, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
 	if err != nil {
-		t.Fatalf("read fixture %s: %v", path, err)
+		t.Fatalf("NewSimpleTranslator: %v", err)
 	}
-	var fx translatorFixture
-	if err := json.Unmarshal(data, &fx); err != nil {
-		t.Fatalf("unmarshal fixture %s: %v", path, err)
+
+	tests := []struct {
+		name    string
+		locale  string
+		key     string
+		args    []any
+		want    string
+		wantErr error
+	}{
+		{
+			name:   "explicit locale",
+			locale: "es",
+			key:    "home.title",
+			want:   "Bienvenido",
+		},
+		{
+			name: "default locale",
+			key:  "home.title",
+			want: "Welcome",
+		},
+		{
+			name:   "format args",
+			locale: "en",
+			key:    "home.greeting",
+			args:   []any{"Alice"},
+			want:   "Hello Alice",
+		},
+		{
+			name:    "missing key",
+			locale:  "en",
+			key:     "missing",
+			wantErr: ErrMissingTranslation,
+		},
+		{
+			name:    "missing locale",
+			locale:  "",
+			key:     "spanish",
+			wantErr: ErrMissingTranslation,
+		},
 	}
-	return fx
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := translator.Translate(tc.locale, tc.key, tc.args...)
+			if tc.wantErr != nil {
+				if err != tc.wantErr {
+					t.Fatalf("expected err %v, got %v", tc.wantErr, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+
+			if got != tc.want {
+				t.Fatalf("Translate() = %q want %q", got, tc.want)
+			}
+		})
+	}
 }
 
-func loadTranslatorGolden(t *testing.T, path string) translatorGolden {
-	t.Helper()
-	data, err := os.ReadFile(path)
+func TestSimpleTranslatorCustomFormatter(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {
+			"home.greeting": "Hello %s",
+		},
+	})
+
+	rack := false
+	formatter := FormatterFunc(func(template string, args ...any) (string, error) {
+		rack = true
+		return "custom", nil
+	})
+
+	translator, err := NewSimpleTranslator(store,
+		WithTranslatorDefaultLocale("en"),
+		WithTranslatorFormatter(formatter),
+	)
 	if err != nil {
-		t.Fatalf("read golden %s: %v", path, err)
+		t.Fatalf("NewSimpleTranslator: %v", err)
 	}
-	var g translatorGolden
-	if err := json.Unmarshal(data, &g); err != nil {
-		t.Fatalf("unmarshal golden %s: %v", path, err)
-	}
-	return g
-}
 
-func newContractTranslator(t *testing.T, fx translatorFixture) Translator {
-	t.Helper()
-	t.Fatalf("translator construction pending implementation")
-	return nil
+	got, err := translator.Translate("", "home.greeting", "bob")
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if got != "custom" {
+		t.Fatalf("Translate() = %q want custom", got)
+	}
+
+	if !rack {
+		t.Fatal("expected formatter to be invoked")
+	}
 }
