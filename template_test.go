@@ -140,12 +140,12 @@ func TestTemplateHelpersFormatterCurrencyProvider(t *testing.T) {
 func TestTemplateHelpersCustomTranslateKey(t *testing.T) {
 	helpers := TemplateHelpers(nil, HelperConfig{TemplateHelperKey: "t"})
 
-	t, ok := helpers["t"].(func(any, string, ...any) string)
+	helper, ok := helpers["t"].(func(any, string, ...any) string)
 	if !ok {
 		t.Fatalf("custom translate helper missing: %T", helpers["t"])
 	}
 
-	if got := t("", "foo"); got != "foo" {
+	if got := helper("", "foo"); got != "foo" {
 		t.Fatalf("custom translate fallback = %q", got)
 	}
 }
