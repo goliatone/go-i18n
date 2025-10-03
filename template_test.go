@@ -1,11 +1,8 @@
 package i18n
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
-func TestTemplateHelpersTranslate(t *testing.T) {
+func TestTemplateHelpersTranslateInferredLocale(t *testing.T) {
 	store := NewStaticStore(Translations{
 		"en": {
 			"home.title": "Welcome",
@@ -17,19 +14,25 @@ func TestTemplateHelpersTranslate(t *testing.T) {
 		t.Fatalf("NewSimpleTranslator: %v", err)
 	}
 
-	helpers := TemplateHelpers(translator, HelperConfig{})
+	helpers := TemplateHelpers(translator, HelperConfig{LocaleKey: "current_locale"})
 
-	translate, ok := helpers["translate"].(func(string, string, ...any) string)
+	translate, ok := helpers["translate"].(func(any, string, ...any) string)
 	if !ok {
-		t.Fatalf("translate helper missing or wrong signature: %T", helpers["translate"])
+		t.Fatalf("translate helper signature mismatch: %T", helpers["translate"])
+	}
+
+	ctx := map[string]any{"current_locale": "en"}
+
+	if got := translate(ctx, "home.title"); got != "Welcome" {
+		t.Fatalf("translate inferred locale = %q", got)
 	}
 
 	if got := translate("en", "home.title"); got != "Welcome" {
-		t.Fatalf("translate helper = %q", got)
+		t.Fatalf("translate explicit locale = %q", got)
 	}
 }
 
-func TestTemplateHelpersMissingTranslation(t *testing.T) {
+func TestTemplateHelpersMissingTranslationHandler(t *testing.T) {
 	translator, err := NewSimpleTranslator(NewStaticStore(nil), WithTranslatorDefaultLocale("en"))
 	if err != nil {
 		t.Fatalf("NewSimpleTranslator: %v", err)
@@ -38,43 +41,111 @@ func TestTemplateHelpersMissingTranslation(t *testing.T) {
 	var called bool
 	onMissing := func(locale, key string, args []any, err error) string {
 		called = true
+		if locale != "en" {
+			t.Fatalf("expected locale en, got %q", locale)
+		}
 		if err != ErrMissingTranslation {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		return "missing"
 	}
 
-	helpers := TemplateHelpers(translator, HelperConfig{OnMissing: onMissing})
+	helpers := TemplateHelpers(translator, HelperConfig{
+		LocaleKey: "locale",
+		OnMissing: onMissing,
+	})
 
-	translate := helpers["translate"].(func(string, string, ...any) string)
+	translate := helpers["translate"].(func(any, string, ...any) string)
 
-	if got := translate("en", "unknown"); got != "missing" {
+	ctx := map[string]any{"locale": "en"}
+
+	if got := translate(ctx, "unknown"); got != "missing" {
 		t.Fatalf("translate missing = %q", got)
 	}
 
 	if !called {
-		t.Fatal("expected missing handler to be called")
+		t.Fatal("expected missing handler invocation")
 	}
 }
 
-func TestTemplateHelpersRegistry(t *testing.T) {
+func TestTemplateHelpersCurrentLocaleHelper(t *testing.T) {
+	helpers := TemplateHelpers(nil, HelperConfig{LocaleKey: "locale"})
+
+	currentLocale := helpers["current_locale"].(func(any) string)
+
+	ctx := map[string]string{"locale": "es"}
+	if got := currentLocale(ctx); got != "es" {
+		t.Fatalf("current_locale helper = %q", got)
+	}
+
+	if got := currentLocale("fr"); got != "fr" {
+		t.Fatalf("current_locale fallback string = %q", got)
+	}
+}
+
+func TestTemplateHelpersFormatterUsesProvider(t *testing.T) {
 	registry := NewFormatterRegistry()
-	custom := func(locale string) string { return "custom" }
-	registry.Register("format_custom", custom)
+
+	registry.RegisterProvider("es", func(_ string) map[string]any {
+		return map[string]any{
+			"format_number": func(_ string, value float64, decimals int) string {
+				return "es" // distinctive output to prove provider usage
+			},
+		}
+	})
 
 	helpers := TemplateHelpers(nil, HelperConfig{Registry: registry})
 
-	fn, ok := helpers["format_custom"]
+	formatNumber, ok := helpers["format_number"].(func(string, float64, int) string)
 	if !ok {
-		t.Fatal("expected custom formatter in helpers")
+		t.Fatalf("format_number helper signature mismatch: %T", helpers["format_number"])
 	}
 
-	if reflect.ValueOf(fn).Pointer() != reflect.ValueOf(custom).Pointer() {
-		t.Fatal("unexpected formatter function returned")
+	if got := formatNumber("es", 12.34, 2); got != "es" {
+		t.Fatalf("format_number provider output = %q", got)
 	}
 
-	translate := helpers["translate"].(func(string, string, ...any) string)
-	if got := translate("en", "key"); got != "key" {
-		t.Fatalf("translate fallback = %q", got)
+	if got := formatNumber("en", 12.34, 2); got != FormatNumber("en", 12.34, 2) {
+		t.Fatalf("format_number default output = %q", got)
+	}
+}
+
+func TestTemplateHelpersFormatterCurrencyProvider(t *testing.T) {
+	registry := NewFormatterRegistry()
+
+	registry.RegisterProvider("fr", func(_ string) map[string]any {
+		return map[string]any{
+			"format_currency": func(_ string, amount float64, currency string) string {
+				return "fr"
+			},
+		}
+	})
+
+	helpers := TemplateHelpers(nil, HelperConfig{Registry: registry})
+
+	formatCurrency, ok := helpers["format_currency"].(func(string, float64, string) string)
+	if !ok {
+		t.Fatalf("format_currency helper signature mismatch: %T", helpers["format_currency"])
+	}
+
+	if got := formatCurrency("fr", 10, "EUR"); got != "fr" {
+		t.Fatalf("format_currency provider output = %q", got)
+	}
+
+	if got := formatCurrency("en", 10, "USD"); got != FormatCurrency("en", 10, "USD") {
+		t.Fatalf("format_currency default output = %q", got)
+	}
+}
+
+func TestTemplateHelpersCustomTranslateKey(t *testing.T) {
+	helpers := TemplateHelpers(nil, HelperConfig{TemplateHelperKey: "t"})
+
+	t, ok := helpers["t"].(func(any, string, ...any) string)
+	if !ok {
+		t.Fatalf("custom translate helper missing: %T", helpers["t"])
+	}
+
+	if got := t("", "foo"); got != "foo" {
+		t.Fatalf("custom translate fallback = %q", got)
 	}
 }
