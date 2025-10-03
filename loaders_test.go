@@ -7,8 +7,8 @@ import (
 
 func TestFileLoaderJSONAndYAML(t *testing.T) {
 	loader := NewFileLoader(
-		filepath.Join(".tmp", "testdata", "loader_en.json"),
-		filepath.Join(".tmp", "testdata", "loader_es.yaml"),
+		filepath.Join("testdata", "loader_en.json"),
+		filepath.Join("testdata", "loader_es.yaml"),
 	)
 
 	translations, err := loader.Load()
@@ -30,7 +30,7 @@ func TestFileLoaderJSONAndYAML(t *testing.T) {
 }
 
 func TestFileLoaderUnsupportedExtension(t *testing.T) {
-	loader := NewFileLoader(filepath.Join(".tmp", "testdata", "loader_en.json"), "unsupported.txt")
+	loader := NewFileLoader(filepath.Join("testdata", "loader_en.json"), "unsupported.txt")
 
 	if _, err := loader.Load(); err == nil {
 		t.Fatal("expected error for unsupported extension")
@@ -39,8 +39,8 @@ func TestFileLoaderUnsupportedExtension(t *testing.T) {
 
 func TestFileLoaderIntegration(t *testing.T) {
 	loader := NewFileLoader(
-		filepath.Join(".tmp", "testdata", "loader_en.json"),
-		filepath.Join(".tmp", "testdata", "loader_es.yaml"),
+		filepath.Join("testdata", "loader_en.json"),
+		filepath.Join("testdata", "loader_es.yaml"),
 	)
 
 	cfg, err := NewConfig(

@@ -27,8 +27,8 @@ type contractGolden struct {
 }
 
 func TestTranslatorContract_FallbackFixture(t *testing.T) {
-	fixture := loadContractFixture(t, ".tmp/testdata/translator_fallback_fixture.json")
-	golden := loadContractGolden(t, ".tmp/testdata/translator_fallback_golden.json")
+	fixture := loadContractFixture(t, "testdata/translator_fallback_fixture.json")
+	golden := loadContractGolden(t, "testdata/translator_fallback_golden.json")
 
 	opts := []Option{
 		WithStore(NewStaticStore(Translations(fixture.Translations))),
