@@ -1,0 +1,6 @@
+{
+  "es": {
+    "invoice.greeting": "Hola %s, tu total es %s.",
+    "invoice.subtitle": "Pedido #%s"
+  }
+}

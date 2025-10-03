@@ -1,0 +1,8 @@
+{
+  "en": {
+    "invoice.greeting": "Hello %s, your total is %s.",
+    "invoice.subtitle": "Order #%s",
+    "invoice.farewell": "Thanks for shopping with us!",
+    "shared.missing": "This should fall back"
+  }
+}
