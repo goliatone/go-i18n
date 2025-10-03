@@ -34,7 +34,7 @@ func RegisterXTextFormatters(registry *FormatterRegistry, locales ...string) {
 					}
 					return printer.Sprintf("%f", value)
 				},
-				"format_currenty": func(_ string, amount float64, currency string) string {
+				"format_currency": func(_ string, amount float64, currency string) string {
 					if currency == "" {
 						return printer.Sprintf("%g", amount)
 					}
