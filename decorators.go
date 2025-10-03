@@ -1,24 +1,55 @@
 package i18n
 
 type TranslationHook interface {
-	BeforeTranslate(locale, key string, args []any)
-	AfterTranslate(locale, key string, args []any, result string, err error)
+	BeforeTranslate(ctx *TranslatorHookContext)
+	AfterTranslate(ctx *TranslatorHookContext)
 }
 
-type TranslationHookFuncs struct {
-	Before func(locale, key string, args []any)
-	After  func(locale, key string, args []any, result string, err error)
+type TranslatorHookContext struct {
+	Locale   string
+	Key      string
+	Args     []any
+	Result   string
+	Error    error
+	Metadata map[string]any
 }
 
-func (h TranslationHookFuncs) BeforeTranslate(locale, key string, args []any) {
-	if h.Before != nil {
-		h.Before(locale, key, args)
+func (ctx *TranslatorHookContext) ensureMetadata() {
+	if ctx.Metadata == nil {
+		ctx.Metadata = make(map[string]any)
 	}
 }
 
-func (h TranslationHookFuncs) AfterTranslate(locale, key string, args []any, result string, err error) {
+func (ctx *TranslatorHookContext) SetMetadata(key string, value any) {
+	if ctx == nil || key == "" {
+		return
+	}
+	ctx.ensureMetadata()
+	ctx.Metadata[key] = value
+}
+
+func (ctx *TranslatorHookContext) MetadataValue(key string) (any, bool) {
+	if ctx == nil || ctx.Metadata == nil {
+		return nil, false
+	}
+	val, ok := ctx.Metadata[key]
+	return val, ok
+}
+
+type TranslationHookFuncs struct {
+	Before func(ctx *TranslatorHookContext)
+	After  func(ctx *TranslatorHookContext)
+}
+
+func (h TranslationHookFuncs) BeforeTranslate(ctx *TranslatorHookContext) {
+	if h.Before != nil {
+		h.Before(ctx)
+	}
+}
+
+func (h TranslationHookFuncs) AfterTranslate(ctx *TranslatorHookContext) {
 	if h.After != nil {
-		h.After(locale, key, args, result, err)
+		h.After(ctx)
 	}
 }
 
@@ -55,15 +86,27 @@ func (t *HookedTranslator) Translate(locale, key string, args ...any) (string, e
 		return "", ErrMissingTranslation
 	}
 
-	for _, hook := range t.hooks {
-		hook.BeforeTranslate(locale, key, args)
+	ctx := &TranslatorHookContext{
+		Locale: locale,
+		Key:    key,
+		Args:   args,
 	}
 
-	result, err := t.next.Translate(locale, key, args...)
+	for _, hook := range t.hooks {
+		hook.BeforeTranslate(ctx)
+	}
+
+	result, err := t.next.Translate(ctx.Locale, ctx.Key, ctx.Args...)
+
+	ctx.Result = result
+	ctx.Error = err
 
 	for _, hook := range t.hooks {
-		hook.AfterTranslate(locale, key, args, result, err)
+		hook.AfterTranslate(ctx)
 	}
+
+	result = ctx.Result
+	err = ctx.Error
 
 	return result, err
 }
