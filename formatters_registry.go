@@ -5,11 +5,14 @@ import (
 	"sync"
 )
 
+type FormatterProvider func(locale string) map[string]any
+
 // FormatRegistry manages formatter functions and locale specific overrides
 type FormatterRegistry struct {
 	mu        sync.RWMutex
 	defaults  map[string]any
-	ovverides map[string]map[string]any
+	overrides map[string]map[string]any
+	providers map[string]FormatterProvider
 }
 
 // NewFormatterRegistry seeds a registry with default formatter implementations
@@ -29,7 +32,8 @@ func NewFormatterRegistry() *FormatterRegistry {
 
 	return &FormatterRegistry{
 		defaults:  defaults,
-		ovverides: make(map[string]map[string]any),
+		overrides: make(map[string]map[string]any),
+		providers: make(map[string]FormatterProvider),
 	}
 }
 
@@ -58,17 +62,32 @@ func (r *FormatterRegistry) RegisterLocale(locale, name string, fn any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.ovverides == nil {
-		r.ovverides = make(map[string]map[string]any)
+	if r.overrides == nil {
+		r.overrides = make(map[string]map[string]any)
 	}
 
-	helpers := r.ovverides[locale]
+	helpers := r.overrides[locale]
 
 	if helpers == nil {
 		helpers = make(map[string]any)
-		r.ovverides[locale] = helpers
+		r.overrides[locale] = helpers
 	}
 	helpers[name] = fn
+}
+
+func (r *FormatterRegistry) RegisterProvider(locale string, provider FormatterProvider) {
+	if locale == "" || provider == nil {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.providers == nil {
+		r.providers = make(map[string]FormatterProvider)
+	}
+
+	r.providers[locale] = provider
 }
 
 // Formatter returns the helper implementation for the given name and locale
@@ -80,16 +99,35 @@ func (r *FormatterRegistry) Formatter(name, locale string) (any, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if locale != "" && r.ovverides != nil {
-		if helpers, ok := r.ovverides[locale]; ok {
-			if fn, ok := helpers[name]; ok {
-				return fn, true
-			}
+	if locale != "" {
+		if fn := r.lookupLocaleLocked(name, locale); fn != nil {
+			return fn, true
 		}
 	}
 
 	fn, ok := r.defaults[name]
 	return fn, ok
+}
+
+func (r *FormatterRegistry) lookupLocaleLocked(name, locale string) any {
+	if r.overrides != nil {
+		if helpers, ok := r.overrides[locale]; ok {
+			if fn, ok := helpers[name]; ok {
+				return fn
+			}
+		}
+	}
+
+	if r.providers != nil {
+		if provider, ok := r.providers[locale]; ok && provider != nil {
+			if helpers := provider(locale); helpers != nil {
+				if fn, ok := helpers[name]; ok {
+					return fn
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // FUncMap returns all helper functions applicable to the locale
@@ -100,8 +138,16 @@ func (r *FormatterRegistry) FuncMap(locale string) map[string]any {
 	result := make(map[string]any, len(r.defaults))
 	maps.Copy(result, r.defaults)
 
-	if locale != "" && r.ovverides != nil {
-		if helpers, ok := r.ovverides[locale]; ok {
+	if locale != "" && r.providers != nil {
+		if provider, ok := r.providers[locale]; ok && provider != nil {
+			if helpers := provider(locale); helpers != nil {
+				maps.Copy(result, helpers)
+			}
+		}
+	}
+
+	if locale != "" && r.overrides != nil {
+		if helpers, ok := r.overrides[locale]; ok {
 			maps.Copy(result, helpers)
 		}
 	}
