@@ -7,16 +7,20 @@ type recordingHook struct {
 	afterCalls  int
 	lastErr     error
 	lastResult  string
+	lastLocale  string
+	lastKey     string
 }
 
-func (h *recordingHook) BeforeTranslate(locale, key string, args []any) {
+func (h *recordingHook) BeforeTranslate(ctx *TranslatorHookContext) {
 	h.beforeCalls++
+	h.lastLocale = ctx.Locale
+	h.lastKey = ctx.Key
 }
 
-func (h *recordingHook) AfterTranslate(locale, key string, args []any, result string, err error) {
+func (h *recordingHook) AfterTranslate(ctx *TranslatorHookContext) {
 	h.afterCalls++
-	h.lastErr = err
-	h.lastResult = result
+	h.lastErr = ctx.Error
+	h.lastResult = ctx.Result
 }
 
 func TestWrapTranslatorWithHooks(t *testing.T) {
@@ -43,6 +47,10 @@ func TestWrapTranslatorWithHooks(t *testing.T) {
 
 	if recorder.beforeCalls != 1 || recorder.afterCalls != 1 {
 		t.Fatalf("unexpected hook counts before=%d after=%d", recorder.beforeCalls, recorder.afterCalls)
+	}
+
+	if recorder.lastLocale != "en" || recorder.lastKey != "home.title" {
+		t.Fatalf("hook saw locale/key %s/%s", recorder.lastLocale, recorder.lastKey)
 	}
 
 	if recorder.lastErr != nil {

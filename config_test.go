@@ -143,8 +143,10 @@ func TestBuildTranslatorAppliesHooks(t *testing.T) {
 
 	var before, after int
 	hook := TranslationHookFuncs{
-		Before: func(locale, key string, args []any) { before++ },
-		After:  func(locale, key string, args []any, result string, err error) { after++ },
+		Before: func(ctx *TranslatorHookContext) { before++ },
+		After: func(ctx *TranslatorHookContext) {
+			after++
+		},
 	}
 
 	cfg, err := NewConfig(
