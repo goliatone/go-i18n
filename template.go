@@ -1,8 +1,6 @@
 package i18n
 
-import (
-	"reflect"
-)
+import "reflect"
 
 // MissingTranslationHandler decides what string should be emitted when
 // Translator.Translate returns an error
@@ -34,7 +32,7 @@ func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 		translateKey = "translate"
 	}
 
-	helpers[translateKey] = func(localeSrc, key string, args ...any) string {
+	helpers[translateKey] = func(localeSrc any, key string, args ...any) string {
 		if key == "" {
 			return ""
 		}
@@ -49,6 +47,7 @@ func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 		if err != nil {
 			return handleMissing(cfg.OnMissing, locale, key, args, err)
 		}
+
 		return msg
 	}
 
