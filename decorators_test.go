@@ -23,6 +23,19 @@ func (h *recordingHook) AfterTranslate(ctx *TranslatorHookContext) {
 	h.lastResult = ctx.Result
 }
 
+type mutatingHook struct{}
+
+func (mutatingHook) BeforeTranslate(ctx *TranslatorHookContext) {
+	ctx.Locale = "en"
+	ctx.Key = "home.title"
+	ctx.Args = append([]any(nil), ctx.Args...)
+}
+
+func (mutatingHook) AfterTranslate(ctx *TranslatorHookContext) {
+	ctx.Result = ctx.Result + "!"
+	ctx.Error = nil
+}
+
 func TestWrapTranslatorWithHooks(t *testing.T) {
 	store := NewStaticStore(Translations{
 		"en": {"home.title": "Welcome"},
@@ -78,5 +91,59 @@ func TestWrapTranslatorWithHooksError(t *testing.T) {
 
 	if recorder.lastErr != ErrMissingTranslation {
 		t.Fatalf("hook saw err %v, want %v", recorder.lastErr, ErrMissingTranslation)
+	}
+}
+
+func TestHookedTranslatorUsesMutatedContext(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {"home.title": "Welcome"},
+	})
+
+	base, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	translator := WrapTranslatorWithHooks(base, mutatingHook{})
+
+	got, err := translator.Translate("es", "ignored")
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if got != "Welcome!" {
+		t.Fatalf("expected mutated result, got %q", got)
+	}
+}
+
+func TestTranslationHookFuncsMutation(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"en": {"home.title": "Welcome"},
+	})
+
+	base, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	hook := TranslationHookFuncs{
+		Before: func(ctx *TranslatorHookContext) {
+			ctx.Locale = "en"
+			ctx.Key = "home.title"
+		},
+		After: func(ctx *TranslatorHookContext) {
+			ctx.Result = ctx.Result + "!"
+		},
+	}
+
+	translator := WrapTranslatorWithHooks(base, hook)
+
+	got, err := translator.Translate("es", "ignored")
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if got != "Welcome!" {
+		t.Fatalf("expected hook funcs mutation, got %q", got)
 	}
 }
