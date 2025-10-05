@@ -1,21 +1,35 @@
 package i18n
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
 type FileLoader struct {
-	paths []string
+	paths     []string
+	rulePaths []string
 }
 
 func NewFileLoader(paths ...string) *FileLoader {
 	return &FileLoader{paths: append([]string(nil), paths...)}
+}
+
+func (l *FileLoader) WithPluralRuleFiles(paths ...string) *FileLoader {
+	if l == nil {
+		return l
+	}
+	if len(paths) == 0 {
+		return l
+	}
+	l.rulePaths = append(l.rulePaths, paths...)
+	return l
 }
 
 func (l *FileLoader) Load() (Translations, error) {
@@ -23,7 +37,7 @@ func (l *FileLoader) Load() (Translations, error) {
 		return nil, errors.New("i18n: no loader paths configured")
 	}
 
-	result := make(Translations)
+	buckets := make(map[string]map[string]Message)
 
 	for _, path := range l.paths {
 		data, err := os.ReadFile(path)
@@ -35,33 +49,127 @@ func (l *FileLoader) Load() (Translations, error) {
 		if err != nil {
 			return nil, fmt.Errorf("i18n: decode %s: %w", path, err)
 		}
-		mergeTranslations(result, src)
+		mergeMessageBuckets(buckets, src)
 	}
 
-	return result, nil
+	rules, err := l.loadPluralRules()
+	if err != nil {
+		return nil, err
+	}
+
+	catalogs := make(Translations, len(buckets))
+	for locale, messages := range buckets {
+		catalog := &LocaleCatalog{
+			Locale: Locale{Code: locale},
+		}
+		if len(messages) > 0 {
+			catalog.Messages = messages
+		}
+		if ruleSet, ok := rules[locale]; ok {
+			catalog.CardinalRules = ruleSet
+			if ruleSet.DisplayName != "" {
+				catalog.Locale.Name = ruleSet.DisplayName
+			}
+			if ruleSet.Parent != "" {
+				catalog.Locale.Parent = ruleSet.Parent
+			}
+		}
+		catalogs[locale] = catalog
+	}
+
+	return catalogs, nil
 }
 
-func decodeTranslationFile(path string, data []byte) (Translations, error) {
+func decodeTranslationFile(path string, data []byte) (map[string]map[string]Message, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 
 	switch ext {
 	case ".json":
-		var parsed Translations
-		if err := json.Unmarshal(data, &parsed); err != nil {
-			return nil, err
-		}
-		return parsed, nil
+		return decodeTranslationsJSON(path, data)
 	case ".yaml", ".yml":
-		return decodeTranslationsYAML(string(data))
+		return decodeTranslationsYAML(path, string(data))
 	default:
 		return nil, fmt.Errorf("unsupported extension %s", ext)
 	}
 }
 
-func decodeTranslationsYAML(input string) (Translations, error) {
-	translations := make(Translations)
+func decodeTranslationsJSON(path string, data []byte) (map[string]map[string]Message, error) {
+	var raw map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]map[string]Message, len(raw))
+	for locale, catalog := range raw {
+		if locale == "" {
+			return nil, fmt.Errorf("i18n: empty locale in %s", path)
+		}
+		normalized := make(map[string]Message, len(catalog))
+		for key, rawMessage := range catalog {
+			if key == "" {
+				return nil, fmt.Errorf("i18n: empty key in %s/%s", locale, path)
+			}
+			message, err := buildMessageFromJSON(locale, key, rawMessage, path)
+			if err != nil {
+				return nil, fmt.Errorf("%s/%s: %w", locale, key, err)
+			}
+			normalized[key] = message
+		}
+		result[locale] = normalized
+	}
+	return result, nil
+}
+
+func buildMessageFromJSON(locale, key string, raw json.RawMessage, source string) (Message, error) {
+	var singular string
+	if err := json.Unmarshal(raw, &singular); err == nil {
+		return buildMessageFromVariants(locale, key, map[PluralCategory]string{PluralOther: singular}, source)
+	}
+
+	var plural map[string]string
+	if err := json.Unmarshal(raw, &plural); err == nil {
+		variants := make(map[PluralCategory]string, len(plural))
+		for category, template := range plural {
+			cat, err := parsePluralCategory(category)
+			if err != nil {
+				return Message{}, err
+			}
+			variants[cat] = template
+		}
+		return buildMessageFromVariants(locale, key, variants, source)
+	}
+
+	return Message{}, fmt.Errorf("unsupported message payload")
+}
+
+func decodeTranslationsYAML(path, input string) (map[string]map[string]Message, error) {
+	catalogs := make(map[string]map[string]Message)
 
 	var currentLocale string
+	var currentKey string
+	var currentVariants map[PluralCategory]string
+
+	flushVariants := func() error {
+		if currentKey == "" {
+			return nil
+		}
+		if currentLocale == "" {
+			return fmt.Errorf("variant block defined before locale in %s", path)
+		}
+		message, err := buildMessageFromVariants(currentLocale, currentKey, currentVariants, path)
+		if err != nil {
+			return err
+		}
+		catalog := catalogs[currentLocale]
+		if catalog == nil {
+			catalog = make(map[string]Message)
+			catalogs[currentLocale] = catalog
+		}
+		catalog[currentKey] = message
+		currentKey = ""
+		currentVariants = nil
+		return nil
+	}
 
 	lines := strings.Split(input, "\n")
 	for idx, raw := range lines {
@@ -70,71 +178,322 @@ func decodeTranslationsYAML(input string) (Translations, error) {
 			continue
 		}
 
-		if !strings.HasPrefix(raw, " ") && !strings.HasPrefix(raw, "\t") {
+		indent := leadingSpaces(raw)
+		switch indent {
+		case 0:
+			if err := flushVariants(); err != nil {
+				return nil, fmt.Errorf("line %d: %w", idx+1, err)
+			}
 			if !strings.HasSuffix(line, ":") {
-				return nil, fmt.Errorf("invalid yaml locale in line %d", idx+1)
+				return nil, fmt.Errorf("invalid locale declaration on line %d", idx+1)
 			}
 			locale := strings.TrimSuffix(line, ":")
 			if locale == "" {
 				return nil, fmt.Errorf("empty locale on line %d", idx+1)
 			}
-
 			currentLocale = locale
-			if translations[currentLocale] == nil {
-				translations[currentLocale] = make(map[string]string)
+			if catalogs[currentLocale] == nil {
+				catalogs[currentLocale] = make(map[string]Message)
 			}
-
-			continue
-		}
-
-		if currentLocale == "" {
-			return nil, fmt.Errorf("entry before locale definition on line %d", idx+1)
-		}
-
-		entry := strings.TrimSpace(raw)
-		parts := strings.SplitN(entry, ":", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid key/value on line %d", idx+1)
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		value = strings.TrimPrefix(value, "|")
-		value = strings.TrimSpace(value)
-
-		if key == "" {
-			return nil, fmt.Errorf("emtpy key on line %d", idx+1)
-		}
-
-		if n := len(value); n >= 2 {
-			switch {
-			case strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\""):
-				value = strings.Trim(value, "\"")
-			case strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'"):
-				value = strings.Trim(value, "'")
+		case 2:
+			if err := flushVariants(); err != nil {
+				return nil, fmt.Errorf("line %d: %w", idx+1, err)
 			}
+			key, value, hasValue := splitKeyValue(line)
+			if key == "" {
+				return nil, fmt.Errorf("empty key on line %d", idx+1)
+			}
+			if !hasValue {
+				currentKey = key
+				currentVariants = make(map[PluralCategory]string)
+				continue
+			}
+			message, err := buildMessageFromVariants(currentLocale, key, map[PluralCategory]string{PluralOther: value}, path)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", idx+1, err)
+			}
+			catalogs[currentLocale][key] = message
+		case 4:
+			if currentKey == "" {
+				return nil, fmt.Errorf("variant value without key on line %d", idx+1)
+			}
+			catKey, value, hasValue := splitKeyValue(line)
+			if !hasValue {
+				return nil, fmt.Errorf("invalid variant on line %d", idx+1)
+			}
+			category, err := parsePluralCategory(catKey)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", idx+1, err)
+			}
+			currentVariants[category] = value
+		default:
+			return nil, fmt.Errorf("unsupported indentation on line %d", idx+1)
 		}
-		translations[currentLocale][key] = value
 	}
 
-	if len(translations) == 0 {
+	if err := flushVariants(); err != nil {
+		return nil, err
+	}
+
+	if len(catalogs) == 0 {
 		return nil, errors.New("empty translations yaml")
 	}
 
-	return translations, nil
+	return catalogs, nil
 }
 
-func mergeTranslations(dst, src Translations) {
-	for locale, catalog := range src {
-		if catalog == nil {
-			continue
-		}
+func buildMessageFromVariants(locale, key string, variants map[PluralCategory]string, source string) (Message, error) {
+	if len(variants) == 0 {
+		return Message{}, fmt.Errorf("no variants defined for %s", key)
+	}
 
+	if _, ok := variants[PluralOther]; !ok {
+		if len(variants) == 1 {
+			for category, template := range variants {
+				variants[PluralOther] = template
+				delete(variants, category)
+				break
+			}
+		} else {
+			return Message{}, fmt.Errorf("missing 'other' plural form for %s", key)
+		}
+	}
+
+	message := Message{
+		MessageMetadata: MessageMetadata{
+			ID:     key,
+			Domain: inferDomain(key),
+			Locale: locale,
+		},
+		Variants: make(map[PluralCategory]MessageVariant, len(variants)),
+	}
+
+	for category, template := range variants {
+		message.SetVariant(category, buildVariant(template, source))
+	}
+
+	return message, nil
+}
+
+func buildVariant(template, source string) MessageVariant {
+	variant := MessageVariant{
+		Template: template,
+		Source:   source,
+		Checksum: checksum(template),
+	}
+	if strings.Contains(template, "{count}") {
+		variant.UsesCount = true
+	}
+	return variant
+}
+
+func mergeMessageBuckets(dst, src map[string]map[string]Message) {
+	for locale, catalog := range src {
 		target := dst[locale]
 		if target == nil {
-			target = make(map[string]string, len(catalog))
+			target = make(map[string]Message, len(catalog))
 			dst[locale] = target
 		}
-		maps.Copy(target, catalog)
+		for key, message := range catalog {
+			if existing, ok := target[key]; ok {
+				if existing.Variants == nil {
+					existing.Variants = make(map[PluralCategory]MessageVariant)
+				}
+				for category, variant := range message.Variants {
+					existing.Variants[category] = variant
+				}
+				existing.MessageMetadata = message.MessageMetadata
+				target[key] = existing
+			} else {
+				target[key] = message
+			}
+		}
 	}
+}
+
+func (l *FileLoader) loadPluralRules() (map[string]*PluralRuleSet, error) {
+	if len(l.rulePaths) == 0 {
+		return nil, nil
+	}
+
+	rules := make(map[string]*PluralRuleSet)
+	for _, path := range l.rulePaths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("i18n: read plural rules %s: %w", path, err)
+		}
+		parsed, err := decodePluralRules(path, data)
+		if err != nil {
+			return nil, fmt.Errorf("i18n: decode plural rules %s: %w", path, err)
+		}
+		mergeRuleSets(rules, parsed)
+	}
+
+	return rules, nil
+}
+
+type rawPluralRulesFile struct {
+	Locales map[string]rawLocaleRules `json:"locales"`
+}
+
+type rawLocaleRules struct {
+	Name     string            `json:"name"`
+	Parent   string            `json:"parent"`
+	Cardinal map[string]string `json:"cardinal"`
+}
+
+func decodePluralRules(path string, data []byte) (map[string]*PluralRuleSet, error) {
+	wrapper := rawPluralRulesFile{}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
+		var direct map[string]rawLocaleRules
+		if errDirect := json.Unmarshal(data, &direct); errDirect != nil {
+			return nil, err
+		}
+		wrapper.Locales = direct
+	}
+
+	if len(wrapper.Locales) == 0 {
+		return nil, fmt.Errorf("i18n: plural rule file %s has no locales", path)
+	}
+
+	result := make(map[string]*PluralRuleSet, len(wrapper.Locales))
+	for locale, rawRules := range wrapper.Locales {
+		ruleSet, err := buildRuleSet(locale, rawRules)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", locale, err)
+		}
+		result[locale] = ruleSet
+	}
+
+	return result, nil
+}
+
+func buildRuleSet(locale string, raw rawLocaleRules) (*PluralRuleSet, error) {
+	if len(raw.Cardinal) == 0 {
+		return nil, fmt.Errorf("missing cardinal rules")
+	}
+
+	entries := make([]PluralRule, 0, len(raw.Cardinal))
+	for category, condition := range raw.Cardinal {
+		cat, err := parsePluralCategory(category)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, PluralRule{Category: cat, Condition: condition})
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		return pluralCategoryOrder(entries[i].Category) < pluralCategoryOrder(entries[j].Category)
+	})
+
+	hasOther := false
+	for _, entry := range entries {
+		if entry.Category == PluralOther {
+			hasOther = true
+			break
+		}
+	}
+	if !hasOther {
+		entries = append(entries, PluralRule{Category: PluralOther, Condition: ""})
+	}
+
+	return &PluralRuleSet{
+		Locale:      locale,
+		DisplayName: raw.Name,
+		Parent:      raw.Parent,
+		Rules:       entries,
+	}, nil
+}
+
+func mergeRuleSets(dst, src map[string]*PluralRuleSet) {
+	for locale, set := range src {
+		dst[locale] = set
+	}
+}
+
+func parsePluralCategory(raw string) (PluralCategory, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "zero":
+		return PluralZero, nil
+	case "one":
+		return PluralOne, nil
+	case "two":
+		return PluralTwo, nil
+	case "few":
+		return PluralFew, nil
+	case "many":
+		return PluralMany, nil
+	case "other":
+		return PluralOther, nil
+	default:
+		return "", fmt.Errorf("unknown plural category %q", raw)
+	}
+}
+
+func pluralCategoryOrder(category PluralCategory) int {
+	switch category {
+	case PluralZero:
+		return 0
+	case PluralOne:
+		return 1
+	case PluralTwo:
+		return 2
+	case PluralFew:
+		return 3
+	case PluralMany:
+		return 4
+	case PluralOther:
+		return 5
+	default:
+		return 99
+	}
+}
+
+func inferDomain(key string) string {
+	if idx := strings.Index(key, "."); idx > 0 {
+		return key[:idx]
+	}
+	return "default"
+}
+
+func checksum(input string) string {
+	sum := sha1.Sum([]byte(input))
+	return hex.EncodeToString(sum[:])
+}
+
+func leadingSpaces(input string) int {
+	count := 0
+	for _, ch := range input {
+		if ch == ' ' {
+			count++
+			continue
+		}
+		if ch == '\t' {
+			count += 4
+			continue
+		}
+		break
+	}
+	return count
+}
+
+func splitKeyValue(line string) (string, string, bool) {
+	parts := strings.SplitN(line, ":", 2)
+	if len(parts) != 2 {
+		return strings.TrimSpace(parts[0]), "", false
+	}
+	key := strings.TrimSpace(parts[0])
+	value := strings.TrimSpace(parts[1])
+	value = strings.TrimPrefix(value, "|")
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") && len(value) >= 2 {
+		value = strings.Trim(value, "\"")
+	}
+	if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") && len(value) >= 2 {
+		value = strings.Trim(value, "'")
+	}
+	if value == "" {
+		return key, value, false
+	}
+	return key, value, true
 }

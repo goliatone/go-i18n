@@ -1,12 +1,8 @@
 package i18n
 
 import (
-	"maps"
 	"sort"
 )
-
-// Translations groups message templates by locale and token
-type Translations map[string]map[string]string
 
 // Store exposes a read only access to translated mesasge templates
 type Store interface {
@@ -45,8 +41,33 @@ func NewStaticStore(data Translations) *StaticStore {
 	locales := make([]string, 0, len(data))
 
 	for locale, catalog := range data {
-		clone := make(map[string]string, len(catalog))
-		maps.Copy(clone, catalog)
+		if catalog == nil {
+			continue
+		}
+		clone := &LocaleCatalog{
+			Locale: catalog.Locale,
+		}
+		if clone.Locale.Code == "" {
+			clone.Locale.Code = locale
+		}
+
+		if len(catalog.Messages) > 0 {
+			clone.Messages = make(map[string]Message, len(catalog.Messages))
+			for key, message := range catalog.Messages {
+				clone.Messages[key] = message.Clone()
+			}
+		}
+
+		if catalog.CardinalRules != nil {
+			clone.CardinalRules = catalog.CardinalRules.Clone()
+			if clone.Locale.Name == "" {
+				clone.Locale.Name = clone.CardinalRules.DisplayName
+			}
+			if clone.Locale.Parent == "" {
+				clone.Locale.Parent = clone.CardinalRules.Parent
+			}
+		}
+
 		translations[locale] = clone
 		locales = append(locales, locale)
 	}
@@ -80,11 +101,20 @@ func (s *StaticStore) Get(locale, key string) (string, bool) {
 		return "", false
 	}
 	catalog, ok := s.translations[locale]
+	if !ok || catalog == nil {
+		return "", false
+	}
+
+	if catalog.Messages == nil {
+		return "", false
+	}
+
+	msg, ok := catalog.Messages[key]
 	if !ok {
 		return "", false
 	}
-	msg, ok := catalog[key]
-	return msg, ok
+
+	return msg.Content(), ok
 }
 
 // Locales returns a slice with all locale codes
