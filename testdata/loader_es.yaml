@@ -1,3 +1,6 @@
 es:
-  home.title: "Bienvenido"
-  home.greeting: "Hola %s"
+  home.title: Bienvenido
+  home.greeting: Hola %s
+  cart.items:
+    one: Tienes {count} artículo
+    other: Tienes {count} artículos

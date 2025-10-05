@@ -1,0 +1,20 @@
+{
+  "locales": {
+    "en": {
+      "name": "English",
+      "parent": "",
+      "cardinal": {
+        "one": "i = 1 and v = 0",
+        "other": ""
+      }
+    },
+    "es": {
+      "name": "Spanish",
+      "parent": "",
+      "cardinal": {
+        "one": "i = 1 and v = 0",
+        "other": ""
+      }
+    }
+  }
+}
