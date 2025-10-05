@@ -25,6 +25,15 @@ func TestStaticStoreGet(t *testing.T) {
 		if ok != tc.ok || got != tc.want {
 			t.Fatalf("Get(%q,%q) = %q,%v want %q,%v", tc.locale, tc.key, got, ok, tc.want, tc.ok)
 		}
+
+		msg, mok := store.Message(tc.locale, tc.key)
+		if tc.ok {
+			if !mok || msg.Content() != tc.want {
+				t.Fatalf("Message(%q,%q) = %+v,%v", tc.locale, tc.key, msg, mok)
+			}
+		} else if mok {
+			t.Fatalf("unexpected message for %q/%q", tc.locale, tc.key)
+		}
 	}
 
 	locales := store.Locales()
@@ -54,6 +63,16 @@ func TestNewStaticStoreCopiesInput(t *testing.T) {
 		t.Fatalf("expected snapshot to remain unchanged, got %q, ok=%v", got, ok)
 	}
 
+	msg, mok := store.Message("en", "home.title")
+	if !mok || msg.Content() != "Welcome" {
+		t.Fatalf("Message snapshot mismatch: %+v,%v", msg, mok)
+	}
+
+	msg.SetContent("Mutated")
+	if got, _ := store.Get("en", "home.title"); got != "Welcome" {
+		t.Fatalf("mutating returned message should not affect store, got %q", got)
+	}
+
 	if _, ok := store.Get("en", "new"); ok {
 		t.Fatal("unexpected key copied from mutated input")
 	}
@@ -79,6 +98,10 @@ func TestNewStaticStoreFromLoader(t *testing.T) {
 
 	if msg, ok := store.Get("en", "home.title"); !ok || msg != "Welcome" {
 		t.Fatalf("Get returned %q,%v", msg, ok)
+	}
+
+	if message, ok := store.Message("en", "home.title"); !ok || message.Content() != "Welcome" {
+		t.Fatalf("Message returned %+v,%v", message, ok)
 	}
 }
 

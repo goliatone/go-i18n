@@ -8,6 +8,8 @@ import (
 type Store interface {
 	// Get returns the message template for locale/key and ok=false if missing
 	Get(locale, key string) (string, bool)
+	// Message returns the full message payload for locale/key
+	Message(locale, key string) (Message, bool)
 	// Locales returns the list of locales known to the store
 	Locales() []string
 }
@@ -30,6 +32,8 @@ type StaticStore struct {
 	translations Translations
 	locales      []string
 }
+
+var _ Store = &StaticStore{}
 
 // NewStaticStore builds an immutable snapthot from the given translations
 func NewStaticStore(data Translations) *StaticStore {
@@ -95,25 +99,34 @@ func NewStaticStoreFromLoader(loader Loader) (*StaticStore, error) {
 	return NewStaticStore(translations), nil
 }
 
-// Get returns the the message template for locale/key
-func (s *StaticStore) Get(locale, key string) (string, bool) {
+func (s *StaticStore) Message(locale, key string) (Message, bool) {
 	if s == nil {
-		return "", false
+		return Message{}, false
 	}
+
 	catalog, ok := s.translations[locale]
 	if !ok || catalog == nil {
-		return "", false
+		return Message{}, false
 	}
 
 	if catalog.Messages == nil {
-		return "", false
+		return Message{}, false
 	}
 
 	msg, ok := catalog.Messages[key]
 	if !ok {
-		return "", false
+		return Message{}, false
 	}
 
+	return msg.Clone(), ok
+}
+
+// Get returns the the message template for locale/key
+func (s *StaticStore) Get(locale, key string) (string, bool) {
+	msg, ok := s.Message(locale, key)
+	if !ok {
+		return "", false
+	}
 	return msg.Content(), ok
 }
 
