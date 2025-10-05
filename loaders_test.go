@@ -9,7 +9,7 @@ func TestFileLoaderJSONAndYAML(t *testing.T) {
 	loader := NewFileLoader(
 		filepath.Join("testdata", "loader_en.json"),
 		filepath.Join("testdata", "loader_es.yaml"),
-	)
+	).WithPluralRuleFiles(filepath.Join("testdata", "cldr_cardinal.json"))
 
 	translations, err := loader.Load()
 	if err != nil {
@@ -20,12 +20,34 @@ func TestFileLoaderJSONAndYAML(t *testing.T) {
 		t.Fatalf("expected 2 locales, got %d", len(translations))
 	}
 
-	if translations["es"]["home.title"] != "Bienvenido" {
-		t.Fatalf("unexpected translation for es: %v", translations["es"]["home.title"])
+	es := translations["es"]
+	if es == nil {
+		t.Fatalf("missing es catalog")
+	}
+	if es.CardinalRules == nil {
+		t.Fatalf("expected cardinal rules for es")
+	}
+	if es.Locale.Name != "Spanish" {
+		t.Fatalf("expected locale name Spanish, got %q", es.Locale.Name)
+	}
+	if es.Messages["home.title"].Content() != "Bienvenido" {
+		t.Fatalf("unexpected translation for es: %v", es.Messages["home.title"].Content())
 	}
 
-	if translations["en"]["home.greeting"] != "Hello %s" {
-		t.Fatalf("unexpected translation for en: %v", translations["en"]["home.greeting"])
+	en := translations["en"]
+	if en == nil {
+		t.Fatalf("missing en catalog")
+	}
+	msg := en.Messages["cart.items"]
+	if msg.Content() != "You have {count} items" {
+		t.Fatalf("expected other variant, got %q", msg.Content())
+	}
+	oneVariant, ok := msg.Variant(PluralOne)
+	if !ok || oneVariant.Template != "You have {count} item" {
+		t.Fatalf("missing plural variant: %+v", oneVariant)
+	}
+	if !oneVariant.UsesCount {
+		t.Fatalf("expected UsesCount=true for plural variant")
 	}
 }
 
@@ -41,7 +63,7 @@ func TestFileLoaderIntegration(t *testing.T) {
 	loader := NewFileLoader(
 		filepath.Join("testdata", "loader_en.json"),
 		filepath.Join("testdata", "loader_es.yaml"),
-	)
+	).WithPluralRuleFiles(filepath.Join("testdata", "cldr_cardinal.json"))
 
 	cfg, err := NewConfig(
 		WithLoader(loader),

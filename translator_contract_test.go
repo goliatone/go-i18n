@@ -30,8 +30,13 @@ func TestTranslatorContract_FallbackFixture(t *testing.T) {
 	fixture := loadContractFixture(t, "testdata/translator_fallback_fixture.json")
 	golden := loadContractGolden(t, "testdata/translator_fallback_golden.json")
 
+	translations := make(Translations, len(fixture.Translations))
+	for locale, entries := range fixture.Translations {
+		translations[locale] = newStringCatalog(locale, entries)
+	}
+
 	opts := []Option{
-		WithStore(NewStaticStore(Translations(fixture.Translations))),
+		WithStore(NewStaticStore(translations)),
 		WithDefaultLocale(fixture.DefaultLocale),
 	}
 

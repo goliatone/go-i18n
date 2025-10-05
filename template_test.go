@@ -4,9 +4,9 @@ import "testing"
 
 func TestTemplateHelpersTranslateInferredLocale(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {
+		"en": newStringCatalog("en", map[string]string{
 			"home.title": "Welcome",
-		},
+		}),
 	})
 
 	translator, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))

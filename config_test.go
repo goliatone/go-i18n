@@ -41,7 +41,7 @@ func TestNewConfigDefaults(t *testing.T) {
 func TestNewConfigWithLoader(t *testing.T) {
 	loader := LoaderFunc(func() (Translations, error) {
 		return Translations{
-			"en": {"home.title": "Welcome"},
+			"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 		}, nil
 	})
 
@@ -101,7 +101,7 @@ func TestBuildTranslator(t *testing.T) {
 
 func TestBuildTranslatorUsesFallback(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {"home.title": "Welcome"},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	})
 
 	cfg, err := NewConfig(
@@ -138,7 +138,7 @@ func TestConfigBuildTranslatorNil(t *testing.T) {
 
 func TestBuildTranslatorAppliesHooks(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {"home.title": "Welcome"},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	})
 
 	var before, after int

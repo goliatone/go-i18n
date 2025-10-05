@@ -38,7 +38,7 @@ func (mutatingHook) AfterTranslate(ctx *TranslatorHookContext) {
 
 func TestWrapTranslatorWithHooks(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {"home.title": "Welcome"},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	})
 
 	base, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
@@ -96,7 +96,7 @@ func TestWrapTranslatorWithHooksError(t *testing.T) {
 
 func TestHookedTranslatorUsesMutatedContext(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {"home.title": "Welcome"},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	})
 
 	base, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
@@ -118,7 +118,7 @@ func TestHookedTranslatorUsesMutatedContext(t *testing.T) {
 
 func TestTranslationHookFuncsMutation(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {"home.title": "Welcome"},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	})
 
 	base, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))

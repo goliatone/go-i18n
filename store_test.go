@@ -4,12 +4,8 @@ import "testing"
 
 func TestStaticStoreGet(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {
-			"home.title": "Welcome",
-		},
-		"es": {
-			"home.title": "Bienvenido",
-		},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
+		"es": newStringCatalog("es", map[string]string{"home.title": "Bienvenido"}),
 	})
 
 	tests := []struct {
@@ -39,15 +35,19 @@ func TestStaticStoreGet(t *testing.T) {
 
 func TestNewStaticStoreCopiesInput(t *testing.T) {
 	src := Translations{
-		"en": {
-			"home.title": "Welcome",
-		},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	}
 
 	store := NewStaticStore(src)
 
-	src["en"]["home.title"] = "Changed"
-	src["en"]["new"] = "new"
+	src["en"].Messages["home.title"] = Message{
+		MessageMetadata: MessageMetadata{ID: "home.title", Locale: "en"},
+		Variants:        map[PluralCategory]MessageVariant{PluralOther: {Template: "Changed"}},
+	}
+	src["en"].Messages["new"] = Message{
+		MessageMetadata: MessageMetadata{ID: "new", Locale: "en"},
+		Variants:        map[PluralCategory]MessageVariant{PluralOther: {Template: "new"}},
+	}
 
 	got, ok := store.Get("en", "home.title")
 	if !ok || got != "Welcome" {
@@ -64,9 +64,7 @@ func TestNewStaticStoreFromLoader(t *testing.T) {
 	loader := LoaderFunc(func() (Translations, error) {
 		called = true
 		return Translations{
-			"en": {
-				"home.title": "Welcome",
-			},
+			"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 		}, nil
 	})
 

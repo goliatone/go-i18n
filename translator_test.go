@@ -4,13 +4,13 @@ import "testing"
 
 func TestSimpleTranslatorTranslate(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {
+		"en": newStringCatalog("en", map[string]string{
 			"home.title":    "Welcome",
 			"home.greeting": "Hello %s",
-		},
-		"es": {
+		}),
+		"es": newStringCatalog("es", map[string]string{
 			"home.title": "Bienvenido",
-		},
+		}),
 	})
 
 	translator, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
@@ -81,9 +81,7 @@ func TestSimpleTranslatorTranslate(t *testing.T) {
 
 func TestSimpleTranslatorCustomFormatter(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {
-			"home.greeting": "Hello %s",
-		},
+		"en": newStringCatalog("en", map[string]string{"home.greeting": "Hello %s"}),
 	})
 
 	rack := false
@@ -116,9 +114,7 @@ func TestSimpleTranslatorCustomFormatter(t *testing.T) {
 
 func TestSimpleTranslatorFallbackChain(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {
-			"home.title": "Welcome",
-		},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	})
 
 	resolver := NewStaticFallbackResolver()
@@ -144,9 +140,7 @@ func TestSimpleTranslatorFallbackChain(t *testing.T) {
 
 func TestSimpleTranslatorFallbackMiss(t *testing.T) {
 	store := NewStaticStore(Translations{
-		"en": {
-			"home.title": "Welcome",
-		},
+		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
 	})
 
 	resolver := NewStaticFallbackResolver()
