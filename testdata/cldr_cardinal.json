@@ -4,16 +4,69 @@
       "name": "English",
       "parent": "",
       "cardinal": {
-        "one": "i = 1 and v = 0",
-        "other": ""
+        "one": [
+          [
+            {"operand": "i", "operator": "eq", "values": [1]},
+            {"operand": "v", "operator": "eq", "values": [0]}
+          ]
+        ]
       }
     },
     "es": {
       "name": "Spanish",
       "parent": "",
       "cardinal": {
-        "one": "i = 1 and v = 0",
-        "other": ""
+        "one": [
+          [
+            {"operand": "i", "operator": "eq", "values": [1]},
+            {"operand": "v", "operator": "eq", "values": [0]}
+          ]
+        ]
+      }
+    },
+    "fr": {
+      "name": "French",
+      "parent": "",
+      "cardinal": {
+        "one": [
+          [
+            {"operand": "i", "operator": "in", "values": [0, 1]}
+          ]
+        ]
+      }
+    },
+    "ru": {
+      "name": "Russian",
+      "parent": "",
+      "cardinal": {
+        "one": [
+          [
+            {"operand": "v", "operator": "eq", "values": [0]},
+            {"operand": "i", "mod": 10, "operator": "eq", "values": [1]},
+            {"operand": "i", "mod": 100, "operator": "neq", "values": [11]}
+          ]
+        ],
+        "few": [
+          [
+            {"operand": "v", "operator": "eq", "values": [0]},
+            {"operand": "i", "mod": 10, "operator": "in", "ranges": [{"start": 2, "end": 4}]},
+            {"operand": "i", "mod": 100, "operator": "not_in", "ranges": [{"start": 12, "end": 14}]}
+          ]
+        ],
+        "many": [
+          [
+            {"operand": "v", "operator": "eq", "values": [0]},
+            {"operand": "i", "mod": 10, "operator": "eq", "values": [0]}
+          ],
+          [
+            {"operand": "v", "operator": "eq", "values": [0]},
+            {"operand": "i", "mod": 10, "operator": "in", "ranges": [{"start": 5, "end": 9}]}
+          ],
+          [
+            {"operand": "v", "operator": "eq", "values": [0]},
+            {"operand": "i", "mod": 100, "operator": "in", "ranges": [{"start": 11, "end": 14}]}
+          ]
+        ]
       }
     }
   }
