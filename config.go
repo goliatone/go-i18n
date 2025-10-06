@@ -1,6 +1,9 @@
 package i18n
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // Config captures translator and formatter setup
 type Config struct {
@@ -11,6 +14,8 @@ type Config struct {
 	Resolver      FallbackResolver
 	Formatter     Formatter
 	Hooks         []TranslationHook
+	enablePlural  bool
+	pluralRules   []string
 }
 
 // Option mutates Config during construction
@@ -30,6 +35,7 @@ func NewConfig(opts ...Option) (*Config, error) {
 	}
 
 	cfg.normalizeLocales()
+	cfg.applyPluralRuleOptions()
 
 	if cfg.Store == nil {
 		if cfg.Loader != nil {
@@ -132,6 +138,17 @@ func WithTranslatorHooks(hooks ...TranslationHook) Option {
 	}
 }
 
+// EnablePluralization wires pluralization defaults, optionally registering CLDR rule fixtures via loader aware options
+func EnablePluralization(rulePaths ...string) Option {
+	return func(c *Config) error {
+		c.enablePlural = true
+		if len(rulePaths) > 0 {
+			c.pluralRules = append(c.pluralRules, rulePaths...)
+		}
+		return nil
+	}
+}
+
 func (cfg *Config) BuildTranslator() (Translator, error) {
 	if cfg == nil {
 		return nil, ErrNotImplemented
@@ -150,6 +167,8 @@ func (cfg *Config) BuildTranslator() (Translator, error) {
 	if len(cfg.Hooks) > 0 {
 		translator = WrapTranslatorWithHooks(translator, cfg.Hooks...)
 	}
+
+	cfg.seedResolverFallbacks()
 
 	return translator, nil
 }
@@ -174,4 +193,70 @@ func (cfg *Config) normalizeLocales() {
 	}
 	sort.Strings(dedeped)
 	cfg.Locales = dedeped
+}
+
+func (cfg *Config) applyPluralRuleOptions() {
+	if !cfg.enablePlural || len(cfg.pluralRules) == 0 || cfg.Loader == nil {
+		return
+	}
+
+	switch loader := cfg.Loader.(type) {
+	case *FileLoader:
+		cfg.Loader = loader.WithPluralRuleFiles(cfg.pluralRules...)
+	}
+}
+
+func (cfg *Config) seedResolverFallbacks() {
+	if !cfg.enablePlural {
+		return
+	}
+
+	resolver, ok := cfg.Resolver.(*StaticFallbackResolver)
+	if !ok || resolver == nil {
+		return
+	}
+
+	var localeCandidates []string
+	if cfg.Store != nil {
+		localeCandidates = cfg.Store.Locales()
+	}
+
+	if len(localeCandidates) == 0 {
+		localeCandidates = append(localeCandidates, cfg.Locales...)
+	}
+
+	for _, locale := range localeCandidates {
+		if locale == "" {
+			continue
+		}
+		if existing := resolver.Resolve(locale); existing != nil {
+			continue
+		}
+		chain := deriveLocaleParents(locale)
+		if len(chain) == 0 {
+			continue
+		}
+		resolver.Set(locale, chain...)
+	}
+}
+
+func deriveLocaleParents(locale string) []string {
+	var chain []string
+	current := locale
+	for {
+		parent := collapseLocaleParent(current)
+		if parent == "" {
+			break
+		}
+		chain = append(chain, parent)
+		current = parent
+	}
+	return chain
+}
+
+func collapseLocaleParent(locale string) string {
+	if idx := strings.LastIndex(locale, "-"); idx > 0 {
+		return locale[:idx]
+	}
+	return ""
 }

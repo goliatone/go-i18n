@@ -105,9 +105,33 @@ func (v MessageVariant) clone() MessageVariant {
 	return copy
 }
 
+type PluralRange struct {
+	Start float64
+	End   float64
+}
+
+type PluralConditionOperator string
+
+const (
+	OperatorEquals    PluralConditionOperator = "eq"
+	OperatorNotEquals PluralConditionOperator = "neq"
+	OperatorIn        PluralConditionOperator = "in"
+	OperatorNotIn     PluralConditionOperator = "not_in"
+	OperatorWithin    PluralConditionOperator = "within"
+	OperatorNotWithin PluralConditionOperator = "not_within"
+)
+
+type PluralCondition struct {
+	Operand  string
+	Mod      int
+	Operator PluralConditionOperator
+	Values   []float64
+	Ranges   []PluralRange
+}
+
 type PluralRule struct {
-	Category  PluralCategory
-	Condition string
+	Category PluralCategory
+	Groups   [][]PluralCondition
 }
 
 type PluralRuleSet struct {
@@ -138,11 +162,11 @@ func (set *PluralRuleSet) Categories() []PluralCategory {
 	return categories
 }
 
+// Clone returns a deep copy of the rule set
 func (set *PluralRuleSet) Clone() *PluralRuleSet {
 	if set == nil {
 		return nil
 	}
-
 	out := &PluralRuleSet{
 		Locale:      set.Locale,
 		DisplayName: set.DisplayName,
@@ -150,7 +174,44 @@ func (set *PluralRuleSet) Clone() *PluralRuleSet {
 	}
 	if len(set.Rules) > 0 {
 		out.Rules = make([]PluralRule, len(set.Rules))
-		copy(out.Rules, set.Rules)
+		for i, rule := range set.Rules {
+			out.Rules[i] = clonePluralRule(rule)
+		}
 	}
 	return out
+}
+
+func clonePluralRule(rule PluralRule) PluralRule {
+	if len(rule.Groups) == 0 {
+		return PluralRule{Category: rule.Category}
+	}
+
+	groups := make([][]PluralCondition, len(rule.Groups))
+	for i, group := range rule.Groups {
+		if len(group) == 0 {
+			continue
+		}
+
+		cloned := make([]PluralCondition, len(group))
+		for j, condition := range group {
+			cloned[j] = clonePluralCondition(condition)
+		}
+		groups[i] = cloned
+	}
+
+	return PluralRule{
+		Category: rule.Category,
+		Groups:   groups,
+	}
+}
+
+func clonePluralCondition(condition PluralCondition) PluralCondition {
+	clone := condition
+	if len(condition.Values) > 0 {
+		clone.Values = append([]float64(nil), condition.Values...)
+	}
+	if len(condition.Ranges) > 0 {
+		clone.Ranges = append([]PluralRange(nil), condition.Ranges...)
+	}
+	return clone
 }

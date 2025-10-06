@@ -10,6 +10,8 @@ type Store interface {
 	Get(locale, key string) (string, bool)
 	// Message returns the full message payload for locale/key
 	Message(locale, key string) (Message, bool)
+	// Rules returns the plural rule set for the requested locale
+	Rules(locale string) (*PluralRuleSet, bool)
 	// Locales returns the list of locales known to the store
 	Locales() []string
 }
@@ -128,6 +130,17 @@ func (s *StaticStore) Get(locale, key string) (string, bool) {
 		return "", false
 	}
 	return msg.Content(), ok
+}
+
+func (s *StaticStore) Rules(locale string) (*PluralRuleSet, bool) {
+	if s == nil {
+		return nil, false
+	}
+	catalog, ok := s.translations[locale]
+	if !ok || catalog == nil || catalog.CardinalRules == nil {
+		return nil, false
+	}
+	return catalog.CardinalRules.Clone(), true
 }
 
 // Locales returns a slice with all locale codes

@@ -186,12 +186,15 @@ func TestHookedTranslatorCapturesPluralMetadata(t *testing.T) {
 		t.Fatalf("NewSimpleTranslator: %v", err)
 	}
 
-	var category any
-	var count any
+	var (
+		plural     PluralHookMetadata
+		rawMissing any
+		hasMissing bool
+	)
 	hook := TranslationHookFuncs{
 		After: func(ctx *TranslatorHookContext) {
-			category, _ = ctx.MetadataValue(metadataPluralCategory)
-			count, _ = ctx.MetadataValue(metadataPluralCount)
+			plural, _ = ctx.PluralMetadata()
+			rawMissing, hasMissing = ctx.MetadataValue(metadataPluralMissing)
 		},
 	}
 
@@ -206,11 +209,86 @@ func TestHookedTranslatorCapturesPluralMetadata(t *testing.T) {
 		t.Fatalf("unexpected result: %q", got)
 	}
 
-	if category != PluralOther {
-		t.Fatalf("expected plural.category metadata %v, got %v", PluralOther, category)
+	if plural.Category != PluralOther {
+		t.Fatalf("expected plural.category metadata %v, got %v", PluralOther, plural.Category)
 	}
 
-	if count != 3 {
-		t.Fatalf("expected plural.count metadata 3, got %v", count)
+	if plural.Count != 3 {
+		t.Fatalf("expected plural.count metadata 3, got %v", plural.Count)
+	}
+
+	if plural.Message != "You have {count} items" {
+		t.Fatalf("expected plural message, got %q", plural.Message)
+	}
+
+	if plural.Missing != nil {
+		t.Fatalf("did not expect missing plural event, got %#v", plural.Missing)
+	}
+}
+
+func TestHookedTranslatorEmitsMissingPluralEvent(t *testing.T) {
+	rules := &PluralRuleSet{
+		Locale: "en",
+		Rules: []PluralRule{
+			{
+				Category: PluralOne,
+				Groups:   [][]PluralCondition{{{Operand: "i", Operator: OperatorEquals, Values: []float64{1}}}},
+			},
+			{Category: PluralOther},
+		},
+	}
+
+	catalog := &LocaleCatalog{
+		Locale: Locale{Code: "en"},
+		Messages: map[string]Message{
+			"cart.items": {
+				MessageMetadata: MessageMetadata{ID: "cart.items", Locale: "en"},
+				Variants: map[PluralCategory]MessageVariant{
+					PluralOther: {Template: "You have {count} items"},
+				},
+			},
+		},
+		CardinalRules: rules,
+	}
+
+	store := NewStaticStore(Translations{"en": catalog})
+	base, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	var (
+		plural     PluralHookMetadata
+		rawMissing any
+		hasMissing bool
+	)
+	hook := TranslationHookFuncs{
+		After: func(ctx *TranslatorHookContext) {
+			plural, _ = ctx.PluralMetadata()
+			rawMissing, hasMissing = ctx.MetadataValue(metadataPluralMissing)
+		},
+	}
+
+	translator := WrapTranslatorWithHooks(base, hook)
+
+	got, err := translator.Translate("en", "cart.items", WithCount(1))
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if got != "You have 1 items" {
+		t.Fatalf("unexpected result: %q", got)
+	}
+
+	if plural.Missing == nil {
+		t.Fatalf("expected missing plural metadata (raw=%#v present=%v)", rawMissing, hasMissing)
+	}
+
+	if plural.Missing.Requested != PluralOne {
+		t.Fatalf("expected requested plural one, got %v", plural.Missing.Requested)
+	}
+
+	if plural.Missing.Fallback != PluralOther {
+		t.Fatalf("expected fallback plural other, got %v", plural.Missing.Fallback)
 	}
 }

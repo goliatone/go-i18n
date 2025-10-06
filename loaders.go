@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
+
+var placeholderPattern = regexp.MustCompile(`\{([a-zA-Z0-9_]+)\}`)
 
 type FileLoader struct {
 	paths     []string
@@ -281,10 +284,51 @@ func buildVariant(template, source string) MessageVariant {
 		Source:   source,
 		Checksum: checksum(template),
 	}
+
 	if strings.Contains(template, "{count}") {
 		variant.UsesCount = true
 	}
+
+	if args := extractFormatArgs(template); len(args) > 0 {
+		variant.FormatArgs = args
+	}
+
 	return variant
+}
+
+func extractFormatArgs(template string) []string {
+	matches := placeholderPattern.FindAllStringSubmatch(template, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(matches))
+	args := make([]string, 0, len(matches))
+
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		name := strings.TrimSpace(match[1])
+		if name == "" {
+			continue
+		}
+		if strings.EqualFold(name, "count") {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		args = append(args, name)
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	sort.Strings(args)
+	return args
 }
 
 func mergeMessageBuckets(dst, src map[string]map[string]Message) {
@@ -337,9 +381,24 @@ type rawPluralRulesFile struct {
 }
 
 type rawLocaleRules struct {
-	Name     string            `json:"name"`
-	Parent   string            `json:"parent"`
-	Cardinal map[string]string `json:"cardinal"`
+	Name     string                         `json:"name"`
+	Parent   string                         `json:"parent"`
+	Cardinal map[string][]rawConditionGroup `json:"cardinal"`
+}
+
+type rawConditionGroup []rawCondition
+
+type rawCondition struct {
+	Operand  string     `json:"operand"`
+	Mod      *int       `json:"mod,omitempty"`
+	Operator string     `json:"operator"`
+	Values   []float64  `json:"values,omitempty"`
+	Ranges   []rawRange `json:"ranges,omitempty"`
+}
+
+type rawRange struct {
+	Start float64 `json:"start"`
+	End   float64 `json:"end"`
 }
 
 func decodePluralRules(path string, data []byte) (map[string]*PluralRuleSet, error) {
@@ -374,12 +433,54 @@ func buildRuleSet(locale string, raw rawLocaleRules) (*PluralRuleSet, error) {
 	}
 
 	entries := make([]PluralRule, 0, len(raw.Cardinal))
-	for category, condition := range raw.Cardinal {
+	categories := make([]string, 0, len(raw.Cardinal))
+	for category := range raw.Cardinal {
+		categories = append(categories, category)
+	}
+	sort.Strings(categories)
+
+	for _, category := range categories {
 		cat, err := parsePluralCategory(category)
 		if err != nil {
 			return nil, err
 		}
-		entries = append(entries, PluralRule{Category: cat, Condition: condition})
+
+		rawGroups := raw.Cardinal[category]
+		groups := make([][]PluralCondition, 0, len(rawGroups))
+		for _, rawGroup := range rawGroups {
+			if len(rawGroup) == 0 {
+				continue
+			}
+			conditions := make([]PluralCondition, 0, len(rawGroup))
+			for _, rawCondition := range rawGroup {
+				operator, err := parseConditionOperator(rawCondition.Operator)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %w", category, err)
+				}
+				cond := PluralCondition{
+					Operand:  rawCondition.Operand,
+					Operator: operator,
+				}
+				if rawCondition.Mod != nil {
+					cond.Mod = *rawCondition.Mod
+				}
+				if len(rawCondition.Values) > 0 {
+					cond.Values = append([]float64(nil), rawCondition.Values...)
+				}
+				if len(rawCondition.Ranges) > 0 {
+					cond.Ranges = make([]PluralRange, 0, len(rawCondition.Ranges))
+					for _, r := range rawCondition.Ranges {
+						cond.Ranges = append(cond.Ranges, PluralRange{Start: r.Start, End: r.End})
+					}
+				}
+				conditions = append(conditions, cond)
+			}
+			if len(conditions) > 0 {
+				groups = append(groups, conditions)
+			}
+		}
+
+		entries = append(entries, PluralRule{Category: cat, Groups: groups})
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -394,7 +495,7 @@ func buildRuleSet(locale string, raw rawLocaleRules) (*PluralRuleSet, error) {
 		}
 	}
 	if !hasOther {
-		entries = append(entries, PluralRule{Category: PluralOther, Condition: ""})
+		entries = append(entries, PluralRule{Category: PluralOther})
 	}
 
 	return &PluralRuleSet{
@@ -427,6 +528,25 @@ func parsePluralCategory(raw string) (PluralCategory, error) {
 		return PluralOther, nil
 	default:
 		return "", fmt.Errorf("unknown plural category %q", raw)
+	}
+}
+
+func parseConditionOperator(raw string) (PluralConditionOperator, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(OperatorEquals), "=":
+		return OperatorEquals, nil
+	case string(OperatorNotEquals), "!=":
+		return OperatorNotEquals, nil
+	case string(OperatorIn):
+		return OperatorIn, nil
+	case string(OperatorNotIn):
+		return OperatorNotIn, nil
+	case string(OperatorWithin):
+		return OperatorWithin, nil
+	case string(OperatorNotWithin):
+		return OperatorNotWithin, nil
+	default:
+		return "", fmt.Errorf("unknown condition operator %q", raw)
 	}
 }
 
