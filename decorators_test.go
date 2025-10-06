@@ -186,15 +186,10 @@ func TestHookedTranslatorCapturesPluralMetadata(t *testing.T) {
 		t.Fatalf("NewSimpleTranslator: %v", err)
 	}
 
-	var (
-		plural     PluralHookMetadata
-		rawMissing any
-		hasMissing bool
-	)
+	var plural PluralHookMetadata
 	hook := TranslationHookFuncs{
 		After: func(ctx *TranslatorHookContext) {
 			plural, _ = ctx.PluralMetadata()
-			rawMissing, hasMissing = ctx.MetadataValue(metadataPluralMissing)
 		},
 	}
 

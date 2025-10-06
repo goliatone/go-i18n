@@ -1,6 +1,9 @@
 package i18n
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestNewConfigDefaults(t *testing.T) {
 	cfg, err := NewConfig(
@@ -169,5 +172,60 @@ func TestBuildTranslatorAppliesHooks(t *testing.T) {
 
 	if before != 1 || after != 1 {
 		t.Fatalf("expected hook counts 1/1, got %d/%d", before, after)
+	}
+}
+
+func TestEnablePluralizationAddsRuleFiles(t *testing.T) {
+	rulePath := filepath.Join("testdata", "cldr_cardinal.json")
+	loader := NewFileLoader(filepath.Join("testdata", "loader_en.json"))
+
+	cfg, err := NewConfig(
+		WithLoader(loader),
+		EnablePluralization(rulePath),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	fileLoader, ok := cfg.Loader.(*FileLoader)
+	if !ok {
+		t.Fatalf("expected FileLoader, got %[1]T", cfg.Loader)
+	}
+
+	if len(fileLoader.rulePaths) != 1 || fileLoader.rulePaths[0] != rulePath {
+		t.Fatalf("rulePaths = %#v, want [%q]", fileLoader.rulePaths, rulePath)
+	}
+
+	if rules, ok := cfg.Store.Rules("en"); !ok || rules == nil {
+		t.Fatal("expected plural rules to be loaded for en")
+	}
+}
+
+func TestEnablePluralizationSeedsParentFallbacks(t *testing.T) {
+	rulePath := filepath.Join("testdata", "cldr_cardinal.json")
+	loader := NewFileLoader(filepath.Join("testdata", "loader_en.json"))
+
+	cfg, err := NewConfig(
+		WithLoader(loader),
+		WithLocales("en-US", "en"),
+		WithDefaultLocale("en-US"),
+		EnablePluralization(rulePath),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	if _, err := cfg.BuildTranslator(); err != nil {
+		t.Fatalf("BuildTranslator: %v", err)
+	}
+
+	resolver, ok := cfg.Resolver.(*StaticFallbackResolver)
+	if !ok {
+		t.Fatalf("expected StaticFallbackResolver, got %[1]T", cfg.Resolver)
+	}
+
+	chain := resolver.Resolve("en-US")
+	if len(chain) != 1 || chain[0] != "en" {
+		t.Fatalf("expected fallback chain [en], got %#v", chain)
 	}
 }
