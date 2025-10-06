@@ -21,6 +21,7 @@ func Run() error {
 		i18n.WithLocales("en", "es"),
 		i18n.WithDefaultLocale("en"),
 		i18n.WithLoader(loader),
+		i18n.EnablePluralization(filepath.Join("testdata", "cldr_cardinal.json")),
 		i18n.WithFallback("es", "en"),
 		i18n.WithTranslatorHooks(i18n.TranslationHookFuncs{
 			After: func(ctx *i18n.TranslatorHookContext) {

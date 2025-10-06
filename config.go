@@ -18,6 +18,10 @@ type Config struct {
 	pluralRules   []string
 }
 
+type pluralRuleLoader interface {
+	WithPluralRules(paths ...string) Loader
+}
+
 // Option mutates Config during construction
 type Option func(*Config) error
 
@@ -200,9 +204,8 @@ func (cfg *Config) applyPluralRuleOptions() {
 		return
 	}
 
-	switch loader := cfg.Loader.(type) {
-	case *FileLoader:
-		cfg.Loader = loader.WithPluralRuleFiles(cfg.pluralRules...)
+	if loader, ok := cfg.Loader.(pluralRuleLoader); ok {
+		cfg.Loader = loader.WithPluralRules(cfg.pluralRules...)
 	}
 }
 
@@ -216,13 +219,28 @@ func (cfg *Config) seedResolverFallbacks() {
 		return
 	}
 
+	seen := make(map[string]struct{}, len(cfg.Locales))
 	var localeCandidates []string
-	if cfg.Store != nil {
-		localeCandidates = cfg.Store.Locales()
+
+	appendCandidate := func(locale string) {
+		if locale == "" {
+			return
+		}
+		if _, exists := seen[locale]; exists {
+			return
+		}
+		seen[locale] = struct{}{}
+		localeCandidates = append(localeCandidates, locale)
 	}
 
-	if len(localeCandidates) == 0 {
-		localeCandidates = append(localeCandidates, cfg.Locales...)
+	if cfg.Store != nil {
+		for _, locale := range cfg.Store.Locales() {
+			appendCandidate(locale)
+		}
+	}
+
+	for _, locale := range cfg.Locales {
+		appendCandidate(locale)
 	}
 
 	for _, locale := range localeCandidates {

@@ -35,6 +35,11 @@ func (l *FileLoader) WithPluralRuleFiles(paths ...string) *FileLoader {
 	return l
 }
 
+// WithPluralRules satisfies the pluralRuleLoader contract used by config wiring.
+func (l *FileLoader) WithPluralRules(paths ...string) Loader {
+	return l.WithPluralRuleFiles(paths...)
+}
+
 func (l *FileLoader) Load() (Translations, error) {
 	if l == nil || len(l.paths) == 0 {
 		return nil, errors.New("i18n: no loader paths configured")
