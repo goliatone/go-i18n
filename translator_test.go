@@ -79,6 +79,117 @@ func TestSimpleTranslatorTranslate(t *testing.T) {
 	}
 }
 
+func TestSimpleTranslatorPluralSelection(t *testing.T) {
+	rules := &PluralRuleSet{
+		Locale: "en",
+		Rules: []PluralRule{
+			{
+				Category: PluralOne,
+				Groups: [][]PluralCondition{
+					{
+						{Operand: "i", Operator: OperatorEquals, Values: []float64{1}},
+						{Operand: "v", Operator: OperatorEquals, Values: []float64{0}},
+					},
+				},
+			},
+			{Category: PluralOther},
+		},
+	}
+
+	catalog := &LocaleCatalog{
+		Locale: Locale{Code: "en"},
+		Messages: map[string]Message{
+			"cart.items": {
+				MessageMetadata: MessageMetadata{ID: "cart.items", Locale: "en"},
+				Variants: map[PluralCategory]MessageVariant{
+					PluralOne:   {Template: "You have {count} item"},
+					PluralOther: {Template: "You have {count} items"},
+				},
+			},
+		},
+		CardinalRules: rules,
+	}
+
+	store := NewStaticStore(Translations{"en": catalog})
+
+	translator, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		count any
+		want  string
+	}{
+		{name: "singular", count: 1, want: "You have 1 item"},
+		{name: "plural", count: 5, want: "You have 5 items"},
+		{name: "no count", count: nil, want: "You have {count} items"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []any{}
+			if tc.count != nil {
+				args = append(args, WithCount(tc.count))
+			}
+			got, err := translator.Translate("en", "cart.items", args...)
+			if err != nil {
+				t.Fatalf("Translate: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("Translate() = %q want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSimpleTranslatorPluralFallbackToOther(t *testing.T) {
+	rules := &PluralRuleSet{
+		Locale: "en",
+		Rules: []PluralRule{
+			{
+				Category: PluralOne,
+				Groups: [][]PluralCondition{
+					{
+						{Operand: "i", Operator: OperatorEquals, Values: []float64{1}},
+					},
+				},
+			},
+			{Category: PluralOther},
+		},
+	}
+
+	catalog := &LocaleCatalog{
+		Locale: Locale{Code: "en"},
+		Messages: map[string]Message{
+			"invite.count": {
+				MessageMetadata: MessageMetadata{ID: "invite.count", Locale: "en"},
+				Variants: map[PluralCategory]MessageVariant{
+					PluralOther: {Template: "Invites: {count}"},
+				},
+			},
+		},
+		CardinalRules: rules,
+	}
+
+	store := NewStaticStore(Translations{"en": catalog})
+
+	translator, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	got, err := translator.Translate("en", "invite.count", WithCount(3))
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if got != "Invites: 3" {
+		t.Fatalf("expected fallback to other variant, got %q", got)
+	}
+}
+
 func TestSimpleTranslatorCustomFormatter(t *testing.T) {
 	store := NewStaticStore(Translations{
 		"en": newStringCatalog("en", map[string]string{"home.greeting": "Hello %s"}),

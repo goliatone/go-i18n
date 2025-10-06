@@ -147,3 +147,70 @@ func TestTranslationHookFuncsMutation(t *testing.T) {
 		t.Fatalf("expected hook funcs mutation, got %q", got)
 	}
 }
+
+func TestHookedTranslatorCapturesPluralMetadata(t *testing.T) {
+	rules := &PluralRuleSet{
+		Locale: "en",
+		Rules: []PluralRule{
+			{
+				Category: PluralOne,
+				Groups: [][]PluralCondition{
+					{
+						{Operand: "i", Operator: OperatorEquals, Values: []float64{1}},
+						{Operand: "v", Operator: OperatorEquals, Values: []float64{0}},
+					},
+				},
+			},
+			{Category: PluralOther},
+		},
+	}
+
+	catalog := &LocaleCatalog{
+		Locale: Locale{Code: "en"},
+		Messages: map[string]Message{
+			"cart.items": {
+				MessageMetadata: MessageMetadata{ID: "cart.items", Locale: "en"},
+				Variants: map[PluralCategory]MessageVariant{
+					PluralOne:   {Template: "You have {count} item"},
+					PluralOther: {Template: "You have {count} items"},
+				},
+			},
+		},
+		CardinalRules: rules,
+	}
+
+	store := NewStaticStore(Translations{"en": catalog})
+
+	base, err := NewSimpleTranslator(store, WithTranslatorDefaultLocale("en"))
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	var category any
+	var count any
+	hook := TranslationHookFuncs{
+		After: func(ctx *TranslatorHookContext) {
+			category, _ = ctx.MetadataValue(metadataPluralCategory)
+			count, _ = ctx.MetadataValue(metadataPluralCount)
+		},
+	}
+
+	translator := WrapTranslatorWithHooks(base, hook)
+
+	got, err := translator.Translate("en", "cart.items", WithCount(3))
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if got != "You have 3 items" {
+		t.Fatalf("unexpected result: %q", got)
+	}
+
+	if category != PluralOther {
+		t.Fatalf("expected plural.category metadata %v, got %v", PluralOther, category)
+	}
+
+	if count != 3 {
+		t.Fatalf("expected plural.count metadata 3, got %v", count)
+	}
+}

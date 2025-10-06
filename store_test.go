@@ -40,11 +40,22 @@ func TestStaticStoreGet(t *testing.T) {
 	if len(locales) != 2 || locales[0] != "en" || locales[1] != "es" {
 		t.Fatalf("Locales() = %v", locales)
 	}
+
+	if _, ok := store.Rules("en"); ok {
+		t.Fatal("expected no plural rules for en")
+	}
 }
 
 func TestNewStaticStoreCopiesInput(t *testing.T) {
 	src := Translations{
 		"en": newStringCatalog("en", map[string]string{"home.title": "Welcome"}),
+	}
+	src["en"].CardinalRules = &PluralRuleSet{
+		Locale: "en",
+		Rules: []PluralRule{
+			{Category: PluralOne},
+			{Category: PluralOther},
+		},
 	}
 
 	store := NewStaticStore(src)
@@ -76,6 +87,17 @@ func TestNewStaticStoreCopiesInput(t *testing.T) {
 	if _, ok := store.Get("en", "new"); ok {
 		t.Fatal("unexpected key copied from mutated input")
 	}
+
+	rules, rok := store.Rules("en")
+	if !rok {
+		t.Fatal("expected rules snapshot")
+	}
+
+	src["en"].CardinalRules.Rules[0].Category = PluralFew
+
+	if got := rules.Rules[0].Category; got != PluralOne {
+		t.Fatalf("rules snapshot mutated: %v", got)
+	}
 }
 
 func TestNewStaticStoreFromLoader(t *testing.T) {
@@ -102,6 +124,10 @@ func TestNewStaticStoreFromLoader(t *testing.T) {
 
 	if message, ok := store.Message("en", "home.title"); !ok || message.Content() != "Welcome" {
 		t.Fatalf("Message returned %+v,%v", message, ok)
+	}
+
+	if _, ok := store.Rules("en"); ok {
+		t.Fatal("expected no rules from loader catalog")
 	}
 }
 
