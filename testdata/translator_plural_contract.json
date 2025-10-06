@@ -1,0 +1,91 @@
+{
+  "default_locale": "en",
+  "loader_paths": [
+    "translator_plural_messages.json"
+  ],
+  "rule_paths": [
+    "cldr_cardinal.json"
+  ],
+  "lookups": [
+    {
+      "name": "english_one",
+      "locale": "en",
+      "key": "cart.items",
+      "count": 1,
+      "want": "You have 1 item",
+      "category": "one"
+    },
+    {
+      "name": "english_other",
+      "locale": "en",
+      "key": "cart.items",
+      "count": 5,
+      "want": "You have 5 items",
+      "category": "other"
+    },
+    {
+      "name": "spanish_one",
+      "locale": "es",
+      "key": "cart.items",
+      "count": 1,
+      "want": "Tienes 1 articulo",
+      "category": "one"
+    },
+    {
+      "name": "spanish_other",
+      "locale": "es",
+      "key": "cart.items",
+      "count": 3,
+      "want": "Tienes 3 articulos",
+      "category": "other"
+    },
+    {
+      "name": "spanish_fallback",
+      "locale": "es-MX",
+      "key": "cart.items",
+      "count": 2,
+      "want": "Tienes 2 articulos",
+      "category": "other"
+    },
+    {
+      "name": "greek_mod_one",
+      "locale": "el",
+      "key": "cart.items",
+      "count": 21,
+      "want": "21 item el-one",
+      "category": "one"
+    },
+    {
+      "name": "greek_teens_other",
+      "locale": "el",
+      "key": "cart.items",
+      "count": 11,
+      "want": "11 items el-other",
+      "category": "other"
+    },
+    {
+      "name": "greek_missing_form",
+      "locale": "el",
+      "key": "alerts.pending",
+      "count": 1,
+      "want": "1 alerts el-other",
+      "category": "one",
+      "missing": true
+    },
+    {
+      "name": "greek_cyprus_parent_rules",
+      "locale": "el-CY",
+      "key": "cart.items",
+      "count": 21,
+      "want": "21 item el-one",
+      "category": "one"
+    }
+  ],
+  "locales": [
+    "en",
+    "es",
+    "es-MX",
+    "el",
+    "el-CY"
+  ]
+}

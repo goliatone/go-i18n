@@ -6,8 +6,20 @@
       "cardinal": {
         "one": [
           [
-            {"operand": "i", "operator": "eq", "values": [1]},
-            {"operand": "v", "operator": "eq", "values": [0]}
+            {
+              "operand": "i",
+              "operator": "eq",
+              "values": [
+                1
+              ]
+            },
+            {
+              "operand": "v",
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            }
           ]
         ]
       }
@@ -18,8 +30,20 @@
       "cardinal": {
         "one": [
           [
-            {"operand": "i", "operator": "eq", "values": [1]},
-            {"operand": "v", "operator": "eq", "values": [0]}
+            {
+              "operand": "i",
+              "operator": "eq",
+              "values": [
+                1
+              ]
+            },
+            {
+              "operand": "v",
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            }
           ]
         ]
       }
@@ -30,7 +54,14 @@
       "cardinal": {
         "one": [
           [
-            {"operand": "i", "operator": "in", "values": [0, 1]}
+            {
+              "operand": "i",
+              "operator": "in",
+              "values": [
+                0,
+                1
+              ]
+            }
           ]
         ]
       }
@@ -41,30 +72,147 @@
       "cardinal": {
         "one": [
           [
-            {"operand": "v", "operator": "eq", "values": [0]},
-            {"operand": "i", "mod": 10, "operator": "eq", "values": [1]},
-            {"operand": "i", "mod": 100, "operator": "neq", "values": [11]}
+            {
+              "operand": "v",
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            },
+            {
+              "operand": "i",
+              "mod": 10,
+              "operator": "eq",
+              "values": [
+                1
+              ]
+            },
+            {
+              "operand": "i",
+              "mod": 100,
+              "operator": "neq",
+              "values": [
+                11
+              ]
+            }
           ]
         ],
         "few": [
           [
-            {"operand": "v", "operator": "eq", "values": [0]},
-            {"operand": "i", "mod": 10, "operator": "in", "ranges": [{"start": 2, "end": 4}]},
-            {"operand": "i", "mod": 100, "operator": "not_in", "ranges": [{"start": 12, "end": 14}]}
+            {
+              "operand": "v",
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            },
+            {
+              "operand": "i",
+              "mod": 10,
+              "operator": "in",
+              "ranges": [
+                {
+                  "start": 2,
+                  "end": 4
+                }
+              ]
+            },
+            {
+              "operand": "i",
+              "mod": 100,
+              "operator": "not_in",
+              "ranges": [
+                {
+                  "start": 12,
+                  "end": 14
+                }
+              ]
+            }
           ]
         ],
         "many": [
           [
-            {"operand": "v", "operator": "eq", "values": [0]},
-            {"operand": "i", "mod": 10, "operator": "eq", "values": [0]}
+            {
+              "operand": "v",
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            },
+            {
+              "operand": "i",
+              "mod": 10,
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            }
           ],
           [
-            {"operand": "v", "operator": "eq", "values": [0]},
-            {"operand": "i", "mod": 10, "operator": "in", "ranges": [{"start": 5, "end": 9}]}
+            {
+              "operand": "v",
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            },
+            {
+              "operand": "i",
+              "mod": 10,
+              "operator": "in",
+              "ranges": [
+                {
+                  "start": 5,
+                  "end": 9
+                }
+              ]
+            }
           ],
           [
-            {"operand": "v", "operator": "eq", "values": [0]},
-            {"operand": "i", "mod": 100, "operator": "in", "ranges": [{"start": 11, "end": 14}]}
+            {
+              "operand": "v",
+              "operator": "eq",
+              "values": [
+                0
+              ]
+            },
+            {
+              "operand": "i",
+              "mod": 100,
+              "operator": "in",
+              "ranges": [
+                {
+                  "start": 11,
+                  "end": 14
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    },
+    "el": {
+      "name": "Greek",
+      "parent": "",
+      "cardinal": {
+        "one": [
+          [
+            {
+              "operand": "n",
+              "mod": 10,
+              "operator": "eq",
+              "values": [
+                1
+              ]
+            },
+            {
+              "operand": "n",
+              "mod": 100,
+              "operator": "neq",
+              "values": [
+                11
+              ]
+            }
           ]
         ]
       }

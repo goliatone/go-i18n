@@ -1,0 +1,26 @@
+{
+  "en": {
+    "cart.items": {
+      "one": "You have {count} item",
+      "other": "You have {count} items"
+    },
+    "alerts.pending": {
+      "other": "{count} alerts"
+    }
+  },
+  "es": {
+    "cart.items": {
+      "one": "Tienes {count} articulo",
+      "other": "Tienes {count} articulos"
+    }
+  },
+  "el": {
+    "cart.items": {
+      "one": "{count} item el-one",
+      "other": "{count} items el-other"
+    },
+    "alerts.pending": {
+      "other": "{count} alerts el-other"
+    }
+  }
+}
