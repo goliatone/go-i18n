@@ -1,0 +1,13 @@
+{
+  "es": {
+    "order.heading": "Hola %s!",
+    "cart.items": {
+      "one": "Tienes {count} articulo en tu carrito.",
+      "other": "Tienes {count} articulos en tu carrito."
+    },
+    "alerts.pending": {
+      "other": "Tienes {count} alertas pendientes."
+    },
+    "inventory.message": "El inventario muestra %d unidades disponibles."
+  }
+}

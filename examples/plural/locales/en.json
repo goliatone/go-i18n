@@ -1,0 +1,13 @@
+{
+  "en": {
+    "order.heading": "Hello %s!",
+    "cart.items": {
+      "one": "You have {count} item in your cart.",
+      "other": "You have {count} items in your cart."
+    },
+    "alerts.pending": {
+      "other": "You have {count} pending alerts."
+    },
+    "inventory.message": "Warehouse shows %d units available."
+  }
+}
