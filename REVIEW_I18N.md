@@ -1,26 +1,28 @@
 # go-i18n Package Review
 
-## Summary
-- The package covers the core translator contract, in-memory store, JSON/YAML loaders, decorator hooks, and go-template helper wiring we need.
-- Several behaviors diverge from the CMS design goals (opaque locale codes, opt-in fallbacks, richer locale metadata), so adopting `go-i18n` as-is would require follow-up changes.
-- Formatter helpers exist but currently emit English-centric output regardless of locale, which undercuts the "locale aware" expectation in our docs.
+## Context
+We are evaluating go-i18n for a multilingual content platform that relies on declarative locale configuration, opt-in fallback chains, and locale-aware formatting. Translators are wired into Go templates, and configuration flows must support both simple deployments (one locale, no fallbacks) and advanced setups (regional variants, plural-aware messaging).
 
 ## Strengths
-- Translator API matches the CMS contract and exposes the same signature (`translator.go:167`).
-- File loader and static store provide immutable snapshots with cloning for safe sharing (`loaders.go:37`, `store.go:34`).
-- Template helper map exposes translation helpers plus formatter lookup/override hooks (`template.go:20-112`).
-- Decorator hooks let us layer logging/metrics without modifying the core translator (`decorators.go:1-118`).
+- Translator contract (`Translate(locale, key string, args ...any)`) matches our integration surface, and the implementation works with metadata-aware hooks.
+- Static store and JSON/YAML loaders provide immutable catalogs that can be shared safely across components.
+- Template helper map and formatter registry allow registration of translation/formatting helpers and opt-in overrides.
+- Decorator hooks enable logging/metrics without modifying the core translator.
 
 ## Gaps & Risks
-- `SimpleTranslator.lookupLocales` always collapses `en-US`→`en` and appends the default locale even when no fallback is configured, violating our "opaque locale codes" and "no implicit fallback" requirements (`translator.go:224-254`).
-- `Config.seedResolverFallbacks` auto-derives fallback chains whenever pluralization is enabled, layering another implicit fallback path that we cannot disable (`config.go:212-258`).
-- Configuration only tracks locale codes; there is no `AddLocale` helper, locale metadata, or functional options for fallback chains/groups as described in our CMS docs (`config.go:8-19`, `types.go:7-17`).
-- Advanced fallback scenarios (locale groups / named chains) are not supported; `StaticFallbackResolver` only stores per-locale arrays with no grouping API (`fallback.go:6-41`).
-- Formatter helpers ignore the `locale` argument and produce English-specific output (e.g., ordinal suffixes, list conjunctions), meaning we cannot deliver locale-aware formatting out of the box (`formatters.go:10-75`).
-- `FormatPhone` is currently a passthrough stub, so phone formatting is effectively unimplemented (`formatters.go:64-65`).
+- `SimpleTranslator.lookupLocales` always collapses locale parents (e.g., `en-US → en`) and appends the default locale even when no fallback chain is configured (`translator.go:224-254`). Missing features: strict locale isolation for markets that require unique copy, the ability to opt out of parent fallbacks, and predictable error reporting when content is absent. Remediation: gate parent/default traversal behind configuration or expose a `DisableImplicitFallbacks` option so callers control the lookup order explicitly.
+- `Config.seedResolverFallbacks` automatically injects parent fallbacks whenever pluralization is enabled (`config.go:212-258`). Missing features: deterministic fallback order that only includes what callers declare, and the ability to keep plural rules without altering fallback behavior. Remediation: separate plural-rule seeding from fallback seeding or add a toggle (e.g., `DisableAutoSeedFallbacks`) so pluralization can be enabled independently.
+- Configuration surface only accepts locale codes. There is no helper such as `AddLocale` with functional options to capture display names, default/active flags, fallback chains, or custom metadata (`config.go:8-19`, `types.go:7-17`). Missing features: a canonical source for locale labels in UI, the ability to mark a default locale atomically with registration, and structured metadata for downstream services (routing, analytics, formatting). Remediation: expand the config API to register locales via structs/functional options and persist metadata alongside the translation store.
+- Formatter helpers ignore the `locale` argument and emit English-centric output (ordinal suffixes, conjunctions, currency format) rather than locale-aware strings (`formatters.go:10-75`). Missing features: localized number/date patterns, locale-specific list/ordinal grammar, and currency/measurement formatting that respects separators and symbol placement. Remediation: integrate locale data (e.g., `golang.org/x/text` plus generated CLDR bundles) or provide per-locale formatter hooks with fixtures so helpers can be swapped without rewriting templates.
+- `FormatPhone` is a passthrough stub, leaving phone-number formatting unimplemented (`formatters.go:64-65`).
+
+## Planned Work Alignment
+- `FORMATTERS_TDD.md` defines the formatter overhaul: hybrid `golang.org/x/text` + generated CLDR bundles, shared fallback resolver usage, eager provider registration for the default `en`/`es` set, an `el` example, and configuration-backed extensibility.
+- `FORMATTERS_TSK.md` breaks that plan into tasks (provider promotion, registry upgrades, generator tooling, helper rewrites, locale fixtures/tests, documentation, benchmarks). Completing these items addresses the formatter-related risks above, including phone formatting.
+- Translator fallback isolation, configuration metadata expansion, and resolver controls remain open items. A separate design (e.g., `TRANSLATOR_TDD.md`) should capture those requirements before implementation begins.
 
 ## Recommendations
-1. Make locale fallback opt-in: remove automatic parent/default fallbacks or gate them behind configuration so simple deployments stay isolated.
-2. Extend configuration helpers to mirror the CMS design (`AddLocale`, `LocaleOption`, metadata fields, locale groups) or supply an adapter layer in `go-cms`.
-3. Flesh out formatter implementations (or wire `golang.org/x/text`) so helpers respect locale conventions; at minimum document the current limitations.
-4. Implement phone formatting or expose an interface so applications can provide their own implementation without monkey-patching the registry.
+1. Make locale fallbacks strictly opt-in: remove automatic parent/default resolution, or guard it behind explicit configuration flags.
+2. Expand the configuration API to register locales with metadata and functional options so downstream systems can rely on a single source of truth.
+3. Enhance formatter implementations (or integrate `golang.org/x/text`) so helpers respect locale conventions; document any interim limitations.
+4. Implement phone-number formatting or expose an interface that allows applications to supply locale-specific formatting logic.
