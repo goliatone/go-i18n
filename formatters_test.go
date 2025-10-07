@@ -43,7 +43,7 @@ func TestFormatNumericHelpers(t *testing.T) {
 		t.Fatalf("FormatPercent = %q", got)
 	}
 
-	if got := FormatMeasurement("en", 12.345, "kg"); got != "12.345 kg" {
+	if got := FormatMeasurement("en", 12.345, "kg"); got != "12.345 kilograms" {
 		t.Fatalf("FormatMeasurement = %q", got)
 	}
 }
