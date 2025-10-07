@@ -69,9 +69,117 @@ function _install:envset {
     fi
 }
 
+function lgr {
+  if command -v lgr >/dev/null 2>&1; then
+    command lgr "$@"
+  else
+    printf '%s\n' "$*"
+  fi
+}
+
 ##########################################
 # Application management
 ##########################################
+
+function _detect:cldr_dir {
+    local search_root=$1
+    if [ ! -d "${search_root}" ]; then
+        return 1
+    fi
+
+    local candidate
+    while IFS= read -r -d '' candidate; do
+        if [ -d "${candidate}/main" ] && [ -d "${candidate}/supplemental" ]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done < <(find "${search_root}" -maxdepth 3 -type d -print0)
+    return 1
+}
+
+function cldr:install {
+    local version=${1:-"46"}
+    local root=${CLDR_INSTALL_DIR:-"$HOME/cldr"}
+    local version_patch=${version}
+    if [[ "${version_patch}" != *.*.* ]]; then
+        version_patch="${version_patch}.0"
+    fi
+
+    local existing
+    existing=$(_detect:cldr_dir "${root}")
+    if [ -n "${existing}" ]; then
+        lgr OK "CLDR data already available at ${existing}"
+        echo "export CLDR_CORE_DIR=${existing}"
+        return 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+        lgr E "curl is required to download CLDR data"
+        return 1
+    fi
+
+    if ! command -v unzip >/dev/null 2>&1; then
+        lgr E "unzip is required to extract CLDR data"
+        return 1
+    fi
+
+    mkdir -p "${root}"
+
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+    trap 'rm -rf "${tmp_dir}"' EXIT
+
+    local archive="${tmp_dir}/cldr-download.zip"
+    local -a urls=(
+        "https://unicode.org/Public/cldr/${version}/core.zip"
+        "https://unicode.org/Public/cldr/${version_patch}/core.zip"
+        "https://unicode-org.github.io/cldr-data/cldr-common-${version}.zip"
+        "https://unicode-org.github.io/cldr-data/cldr-common-${version_patch}.zip"
+    )
+
+    local downloaded=0
+    for url in "${urls[@]}"; do
+        lgr I "Attempting download ${url}"
+        if curl -fL "${url}" -o "${archive}"; then
+            downloaded=1
+            break
+        fi
+    done
+
+    if [[ ${downloaded} -eq 0 ]]; then
+        lgr E "Failed to download CLDR data after trying known locations"
+        return 1
+    fi
+
+    lgr I "Extracting CLDR archive into ${root}"
+    if ! unzip -q "${archive}" -d "${root}"; then
+        lgr E "Failed to extract CLDR archive"
+        return 1
+    fi
+
+    local installed
+    installed=$(_detect:cldr_dir "${root}")
+    if [ -z "${installed}" ]; then
+        lgr E "Could not locate CLDR main/supplemental directories after extraction"
+        return 1
+    fi
+
+    lgr OK "CLDR data installed at ${installed}"
+    lgr I "export CLDR_CORE_DIR=${installed}"
+}
+
+function cldr:gen {
+    local root=${CLDR_INSTALL_DIR:-"$HOME/cldr"}
+    local existing
+    existing=$(_detect:cldr_dir "${root}")
+    if [ -n "${existing}" ]; then
+        lgr I "generating CLDR data..."
+        CLDR_CORE_DIR="${existing}" go generate ./...
+        return 0
+    fi
+
+    lgr E "You need to install CLDR first: run cldr:install"
+}
 
 function dev:install {
     cd "$(pwd)/src" || exit "$?"
