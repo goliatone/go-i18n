@@ -121,9 +121,31 @@ Template usage:
 {{format_currency .Locale .Amount "USD"}}
 ```
 
+### Formatter Registry & Default Locales
+
+- `NewFormatterRegistry` eagerly registers locale-aware providers for English (`en`) and Spanish (`es`) using `golang.org/x/text` and CLDR bundle data.
+- The registry shares the same fallback resolver as the translator; regional locales such as `es-MX` automatically fall back to their parent (`es`) when a dedicated provider is missing.
+- Formatter func maps are memoised per locale. Any call to `Register`, `RegisterLocale`, `RegisterProvider`, or `RegisterTypedProvider` invalidates the cache so new helpers become visible immediately.
+- Template helpers wrap each formatter, defaulting to the registry’s primary locale when templates omit a locale argument. Advanced templates can access `formatter_funcs` to inspect the resolved helper map directly.
+
+### Generating Locale Bundles
+
+Locale-specific CLDR bundles are generated via the helper in `cmd/i18n-formatters`.
+
+1. Install the CLDR archive (`taskfile cldr:install`) and export `CLDR_CORE_DIR`.
+2. Run the generator with the full Go toolchain path:
+   ```bash
+   /Users/goliatone/.g/go/bin/go run ./cmd/i18n-formatters \
+     -locale=en -locale=es -locale=el \
+     -cldr "${CLDR_CORE_DIR}" \
+     -out formatters_cldr_data.go
+   ```
+3. Check the generated file into version control so builds remain deterministic.
+4. Add the new locale to `WithFormatterLocales(...)` (or `WithLocales(...)`) so the registry ensures provider coverage during configuration.
+
 ## Built-in Formatters
 
-The package includes formatters for common use cases:
+The package includes locale-aware formatters for common use cases. Defaults are sourced from CLDR snapshots bundled in `formatters_cldr_data.go` and `golang.org/x/text` primitives.
 
 - `FormatDate(locale, time)` - Date formatting
 - `FormatDateTime(locale, time)` - DateTime formatting
@@ -134,6 +156,7 @@ The package includes formatters for common use cases:
 - `FormatOrdinal(locale, value)` - Ordinal number formatting
 - `FormatList(locale, items)` - List formatting with commas and conjunctions
 - `FormatMeasurement(locale, value, unit)` - Measurement formatting
+- `FormatPhone(locale, raw)` - Phone metadata formatting
 
 Custom formatters can be registered per locale:
 
@@ -141,7 +164,7 @@ Custom formatters can be registered per locale:
 registry := i18n.NewFormatterRegistry()
 registry.Register("format_currency", func(locale string, value float64, currency string) string {
     if locale == "es" && currency == "EUR" {
-        return fmt.Sprintf("%.2f �", value)
+        return fmt.Sprintf("%.2f EUR", value)
     }
     return i18n.FormatCurrency(locale, value, currency)
 })
@@ -174,6 +197,8 @@ cfg, err := i18n.NewConfig(
 - `WithFallbackResolver(resolver)` - Set custom fallback resolver
 - `WithFallback(locale, ...fallbacks)` - Configure fallback chain for a locale
 - `WithFormatter(formatter)` - Set custom formatter
+- `WithFormatterLocales(...locales)` - Configure formatter provider coverage and fallback scaffolding
+- `WithFormatterProvider(locale, provider)` - Inject custom formatter providers per locale
 - `WithTranslatorHooks(...hooks)` - Add translation hooks
 
 ## Error Handling
