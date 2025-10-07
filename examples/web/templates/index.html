@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="{{.Locale}}" dir="{{if eq .Locale "ar"}}rtl{{else}}ltr{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="{{if eq .Locale "ar"}}rtl{{end}}">
+    <div class="container">
+        <header>
+            <h1>{{t .Locale "site.title"}}</h1>
+            <p class="subtitle">{{t .Locale "site.description"}}</p>
+        </header>
+
+        <nav class="language-switcher">
+            <span class="lang-label">{{t .Locale "language.select"}}</span>
+            <a href="?lang=en" class="lang-btn {{if eq .Locale "en"}}active{{end}}">English</a>
+            <a href="?lang=es" class="lang-btn {{if eq .Locale "es"}}active{{end}}">Español</a>
+            <a href="?lang=el" class="lang-btn {{if eq .Locale "el"}}active{{end}}">Ελληνικά</a>
+            <a href="?lang=ar" class="lang-btn {{if eq .Locale "ar"}}active{{end}}">العربية</a>
+        </nav>
+
+        <nav class="main-nav">
+            <a href="?lang={{.Locale}}">{{t .Locale "nav.home"}}</a>
+            <a href="?lang={{.Locale}}&page=about">{{t .Locale "nav.about"}}</a>
+            <a href="?lang={{.Locale}}&page=contact">{{t .Locale "nav.contact"}}</a>
+        </nav>
+
+        <main>
+            <section class="welcome">
+                <h2>{{t .Locale "home.heading" .UserName}}</h2>
+                <p class="intro">{{t .Locale "home.greeting"}}</p>
+                <p>{{t .Locale "home.description"}}</p>
+            </section>
+
+            <section class="info-cards">
+                <div class="card">
+                    <h3>{{t .Locale "about.heading"}}</h3>
+                    <p>{{t .Locale "about.content"}}</p>
+                </div>
+
+                <div class="card">
+                    <h3>{{t .Locale "nav.contact"}}</h3>
+                    {{$items := translate_count .Locale "items.count" .ItemCount}}
+                    <p>{{$items.text}}</p>
+                    <p class="date">{{t .Locale "date.today" .CurrentDate}}</p>
+                </div>
+            </section>
+
+            <section class="demo-info">
+                <h3>Demo Information</h3>
+                <ul>
+                    <li><strong>Current Locale:</strong> {{.Locale}}</li>
+                    <li><strong>User Name:</strong> {{.UserName}}</li>
+                    <li><strong>Item Count:</strong> {{.ItemCount}}</li>
+                    <li><strong>Date:</strong> {{.CurrentDate}}</li>
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <p>{{t .Locale "footer.copyright"}}</p>
+        </footer>
+    </div>
+</body>
+</html>
