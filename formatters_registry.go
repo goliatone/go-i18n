@@ -110,6 +110,7 @@ type FormatterRegistry struct {
 	defaults  map[string]any
 	overrides map[string]map[string]any
 	providers map[string]FormatterProvider
+	globals   map[string]any
 	resolver  FallbackResolver
 	locales   []string
 	typed     map[string]TypedFormatterProvider
@@ -182,11 +183,11 @@ func NewFormatterRegistry(opts ...FormatterRegistryOption) *FormatterRegistry {
 		"format_time":        FormatTime,
 		"format_currency":    FormatCurrency,
 		"format_number":      FormatNumber,
-		"format_percent":     FormatPercent,
-		"format_ordinal":     FormatOrdinal,
-		"format_list":        FormatList,
-		"format_phone":       FormatPhone,
-		"format_measurement": FormatMeasurement,
+		"format_percent":     formatPercentISO,
+		"format_ordinal":     formatOrdinalISO,
+		"format_list":        formatListISO,
+		"format_phone":       formatPhoneISO,
+		"format_measurement": formatMeasurementISO,
 	}
 
 	registry := &FormatterRegistry{
@@ -243,6 +244,11 @@ func (r *FormatterRegistry) Register(name string, fn any) {
 	}
 
 	r.defaults[name] = fn
+
+	if r.globals == nil {
+		r.globals = make(map[string]any)
+	}
+	r.globals[name] = fn
 }
 
 // RegisterLocale registers a locale specific ovveride for the <name> helper
@@ -342,6 +348,12 @@ func (r *FormatterRegistry) lookupLocaleLocked(name, locale string) any {
 			if fn, ok := helpers[name]; ok {
 				return fn
 			}
+		}
+	}
+
+	if r.globals != nil {
+		if fn, ok := r.globals[name]; ok {
+			return fn
 		}
 	}
 

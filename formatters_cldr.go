@@ -80,19 +80,31 @@ func (p *cldrProvider) FuncMap() map[string]any {
 
 func (p *cldrProvider) formatList(_ string, items []string) string {
 	pattern := p.bundle.List
+	pair := pattern.Pair
+	start := pattern.Start
+	middle := pattern.Middle
+	end := pattern.End
+	if end == "" {
+		end = pair
+	}
+
 	switch len(items) {
 	case 0:
 		return ""
 	case 1:
 		return items[0]
 	case 2:
-		return applyListPattern(pattern.Pair, items[0], items[1])
+		return applyListPattern(pair, items[0], items[1])
 	default:
-		result := applyListPattern(pattern.Start, items[0], items[1])
-		for i := 2; i < len(items)-1; i++ {
-			result = applyListPattern(pattern.Middle, result, items[i])
+		if start == "" || middle == "" {
+			head := strings.Join(items[:len(items)-1], ", ")
+			return applyListPattern(end, head, items[len(items)-1])
 		}
-		return applyListPattern(pattern.End, result, items[len(items)-1])
+		result := applyListPattern(start, items[0], items[1])
+		for i := 2; i < len(items)-1; i++ {
+			result = applyListPattern(middle, result, items[i])
+		}
+		return applyListPattern(end, result, items[len(items)-1])
 	}
 }
 
@@ -101,7 +113,7 @@ func (p *cldrProvider) formatOrdinal(_ string, value int) string {
 	case "spanish":
 		return formatOrdinalWithSuffix(value, "º")
 	default:
-		return FormatOrdinal("en", value)
+		return formatOrdinalISO(p.locale, value)
 	}
 }
 
