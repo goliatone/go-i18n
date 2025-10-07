@@ -1,6 +1,9 @@
 package i18n
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestFormatterRegistryProvider(t *testing.T) {
 	registry := NewFormatterRegistry()
@@ -52,6 +55,49 @@ func TestFormatterRegistryProviderOverrideOrder(t *testing.T) {
 	fn := fnAny.(func(string, float64, int) string)
 	if got := fn("fr", 1, 0); got != "override" {
 		t.Fatalf("override should win, got %q", got)
+	}
+}
+
+func TestFormatterRegistryCompositeTypedProvider(t *testing.T) {
+	registry := NewFormatterRegistry()
+
+	p1 := newStubTypedProvider(map[string]any{
+		"format_percent": func(_ string, value float64, decimals int) string {
+			return "provider-one"
+		},
+	}, FormatterCapabilities{Number: true})
+
+	p2 := newStubTypedProvider(map[string]any{
+		"format_measurement": func(_ string, value float64, unit string) string {
+			return "provider-two"
+		},
+	}, FormatterCapabilities{Measurement: true})
+
+	registry.RegisterTypedProvider("zz", p1)
+	registry.RegisterTypedProvider("zz", p2)
+
+	percentAny, ok := registry.Formatter("format_percent", "zz")
+	if !ok {
+		t.Fatal("expected composite percent formatter")
+	}
+	if got := percentAny.(func(string, float64, int) string)("zz", 1.0, 0); got != "provider-one" {
+		t.Fatalf("composite percent formatter = %q", got)
+	}
+
+	measurementAny, ok := registry.Formatter("format_measurement", "zz")
+	if !ok {
+		t.Fatal("expected composite measurement formatter")
+	}
+	if got := measurementAny.(func(string, float64, string) string)("zz", 1.0, "kg"); got != "provider-two" {
+		t.Fatalf("composite measurement formatter = %q", got)
+	}
+
+	funcs := registry.FuncMap("zz")
+	if funcs["format_percent"].(func(string, float64, int) string)("zz", 1.0, 0) != "provider-one" {
+		t.Fatal("func map should expose first provider formatter")
+	}
+	if funcs["format_measurement"].(func(string, float64, string) string)("zz", 1.0, "kg") != "provider-two" {
+		t.Fatal("func map should expose second provider formatter")
 	}
 }
 
@@ -128,4 +174,74 @@ func TestFormatterRegistryCLDRBundles(t *testing.T) {
 	if got := phoneEn("en", "1234567890"); got != "1234567890" {
 		t.Fatalf("format_phone en = %q", got)
 	}
+}
+
+func TestFormatterRegistryLocaleFallbackResolution(t *testing.T) {
+	resolver := NewStaticFallbackResolver()
+	registry := NewFormatterRegistry(
+		WithFormatterRegistryResolver(resolver),
+		WithFormatterRegistryLocales("en", "en-GB"),
+	)
+
+	registry.RegisterLocale("en", "format_list", func(_ string, items []string) string {
+		return "fallback-" + strings.Join(items, "|")
+	})
+
+	fnAny, ok := registry.Formatter("format_list", "en-GB")
+	if !ok {
+		t.Fatal("expected formatter via fallback chain")
+	}
+	got := fnAny.(func(string, []string) string)("en-GB", []string{"a", "b"})
+	if got != "fallback-a|b" {
+		t.Fatalf("fallback formatting mismatch: %q", got)
+	}
+}
+
+func TestFormatterRegistryFallsBackToDefaults(t *testing.T) {
+	registry := NewFormatterRegistry()
+
+	fnAny, ok := registry.Formatter("format_phone", "fr")
+	if !ok {
+		t.Fatal("expected default formatter for format_phone")
+	}
+
+	fn := fnAny.(func(string, string) string)
+	if got := fn("fr", "123"); got != "123" {
+		t.Fatalf("default formatter mismatch: %q", got)
+	}
+}
+
+type stubTypedProvider struct {
+	funcs map[string]any
+	caps  FormatterCapabilities
+}
+
+func newStubTypedProvider(funcs map[string]any, caps FormatterCapabilities) *stubTypedProvider {
+	return &stubTypedProvider{
+		funcs: funcs,
+		caps:  caps,
+	}
+}
+
+func (p *stubTypedProvider) Formatter(name string) (any, bool) {
+	if p == nil || p.funcs == nil {
+		return nil, false
+	}
+	fn, ok := p.funcs[name]
+	return fn, ok
+}
+
+func (p *stubTypedProvider) FuncMap() map[string]any {
+	result := make(map[string]any, len(p.funcs))
+	for key, value := range p.funcs {
+		result[key] = value
+	}
+	return result
+}
+
+func (p *stubTypedProvider) Capabilities() FormatterCapabilities {
+	if p == nil {
+		return FormatterCapabilities{}
+	}
+	return p.caps
 }
