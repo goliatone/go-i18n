@@ -132,7 +132,7 @@ func TestTemplateHelpersFormatterCurrencyProvider(t *testing.T) {
 		t.Fatalf("format_currency provider output = %q", got)
 	}
 
-	if got := formatCurrency("en", 10, "USD"); got != FormatCurrency("en", 10, "USD") {
+	if got := formatCurrency("en", 10, "USD"); got != "$ 10.00" {
 		t.Fatalf("format_currency default output = %q", got)
 	}
 }

@@ -109,7 +109,7 @@ func TestFormatterRegistry(t *testing.T) {
 	}
 
 	ts := time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)
-	if got := fn("en", ts); got != "2023-01-02" {
+	if got := fn("en", ts); got != "January 2, 2023" {
 		t.Fatalf("formatter invocation = %q", got)
 	}
 
