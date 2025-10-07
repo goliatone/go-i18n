@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -108,21 +109,21 @@ func (p *xtextProvider) formatCurrency(_ string, amount float64, code string) st
 
 func (p *xtextProvider) formatDate(_ string, t time.Time) string {
 	if p.isSpanish() {
-		return p.printer.Sprintf("%d de %s de %d", t.Day(), p.monthName(t.Month()), t.Year())
+		return fmt.Sprintf("%d de %s de %d", t.Day(), p.monthName(t.Month()), t.Year())
 	}
 
-	return p.printer.Sprintf("%s %d, %d", p.monthName(t.Month()), t.Day(), t.Year())
+	return fmt.Sprintf("%s %d, %d", p.monthName(t.Month()), t.Day(), t.Year())
 }
 
 func (p *xtextProvider) formatTime(_ string, t time.Time) string {
 	if p.uses12HourClock() {
-		return p.printer.Sprintf("%s", t.Format("3:04 PM"))
+		return t.Format("3:04 PM")
 	}
-	return p.printer.Sprintf("%02d:%02d", t.Hour(), t.Minute())
+	return t.Format("15:04")
 }
 
 func (p *xtextProvider) formatDateTime(locale string, t time.Time) string {
-	return p.printer.Sprintf("%s %s", p.formatDate(locale, t), p.formatTime(locale, t))
+	return fmt.Sprintf("%s %s", p.formatDate(locale, t), p.formatTime(locale, t))
 }
 
 func (p *xtextProvider) monthName(month time.Month) string {
@@ -132,14 +133,16 @@ func (p *xtextProvider) monthName(month time.Month) string {
 	return month.String()
 }
 
+var spanishBase, _ = language.Spanish.Base()
+
 func (p *xtextProvider) isSpanish() bool {
 	base, _ := p.tag.Base()
-	return base == language.Spanish
+	return base == spanishBase
 }
 
 func (p *xtextProvider) uses12HourClock() bool {
 	base, _ := p.tag.Base()
-	return base != language.Spanish
+	return base != spanishBase
 }
 
 var spanishMonths = []string{
