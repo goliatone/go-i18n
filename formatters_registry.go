@@ -8,11 +8,92 @@ import (
 )
 
 type FormatterCapabilities struct {
-	Number   bool
-	Currency bool
-	Date     bool
-	DateTime bool
-	Time     bool
+	Number      bool
+	Currency    bool
+	Date        bool
+	DateTime    bool
+	Time        bool
+	List        bool
+	Ordinal     bool
+	Measurement bool
+	Phone       bool
+}
+
+func mergeCapabilities(a, b FormatterCapabilities) FormatterCapabilities {
+	return FormatterCapabilities{
+		Number:      a.Number || b.Number,
+		Currency:    a.Currency || b.Currency,
+		Date:        a.Date || b.Date,
+		DateTime:    a.DateTime || b.DateTime,
+		Time:        a.Time || b.Time,
+		List:        a.List || b.List,
+		Ordinal:     a.Ordinal || b.Ordinal,
+		Measurement: a.Measurement || b.Measurement,
+		Phone:       a.Phone || b.Phone,
+	}
+}
+
+type compositeTypedProvider struct {
+	providers []TypedFormatterProvider
+}
+
+func newCompositeTypedProvider(providers ...TypedFormatterProvider) TypedFormatterProvider {
+	flattened := make([]TypedFormatterProvider, 0, len(providers))
+	for _, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		if composite, ok := provider.(*compositeTypedProvider); ok {
+			flattened = append(flattened, composite.providers...)
+			continue
+		}
+		flattened = append(flattened, provider)
+	}
+
+	switch len(flattened) {
+	case 0:
+		return nil
+	case 1:
+		return flattened[0]
+	default:
+		return &compositeTypedProvider{providers: flattened}
+	}
+}
+
+func (c *compositeTypedProvider) Formatter(name string) (any, bool) {
+	if c == nil {
+		return nil, false
+	}
+	for i := len(c.providers) - 1; i >= 0; i-- {
+		if fn, ok := c.providers[i].Formatter(name); ok {
+			return fn, true
+		}
+	}
+	return nil, false
+}
+
+func (c *compositeTypedProvider) FuncMap() map[string]any {
+	result := make(map[string]any)
+	if c == nil {
+		return result
+	}
+	for _, provider := range c.providers {
+		for key, value := range provider.FuncMap() {
+			result[key] = value
+		}
+	}
+	return result
+}
+
+func (c *compositeTypedProvider) Capabilities() FormatterCapabilities {
+	var caps FormatterCapabilities
+	if c == nil {
+		return caps
+	}
+	for _, provider := range c.providers {
+		caps = mergeCapabilities(caps, provider.Capabilities())
+	}
+	return caps
 }
 
 type FormatterProvider func(locale string) map[string]any
@@ -127,6 +208,7 @@ func NewFormatterRegistry(opts ...FormatterRegistryOption) *FormatterRegistry {
 
 func (r *FormatterRegistry) registerDefaults() {
 	RegisterXTextFormatters(r, defaultFormatterLocales...)
+	RegisterCLDRFormatters(r, defaultFormatterLocales...)
 }
 
 func (r *FormatterRegistry) registerTypedProviders(providers map[string]TypedFormatterProvider) {
@@ -211,19 +293,27 @@ func (r *FormatterRegistry) RegisterTypedProvider(locale string, provider TypedF
 	if r.typed == nil {
 		r.typed = make(map[string]TypedFormatterProvider)
 	}
-	r.typed[locale] = provider
+	combined := newCompositeTypedProvider(r.typed[locale], provider)
+	r.typed[locale] = combined
 
 	if r.caps == nil {
 		r.caps = make(map[string]FormatterCapabilities)
 	}
-	r.caps[locale] = provider.Capabilities()
+	r.caps[locale] = mergeCapabilities(r.caps[locale], combined.Capabilities())
 
 	if r.providers == nil {
 		r.providers = make(map[string]FormatterProvider)
 	}
-
-	r.providers[locale] = func(string) map[string]any {
-		return cloneFuncMap(provider.FuncMap())
+	previous := r.providers[locale]
+	r.providers[locale] = func(loc string) map[string]any {
+		result := make(map[string]any)
+		if previous != nil {
+			if helpers := previous(loc); helpers != nil {
+				maps.Copy(result, helpers)
+			}
+		}
+		maps.Copy(result, combined.FuncMap())
+		return result
 	}
 }
 
