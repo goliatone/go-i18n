@@ -8,11 +8,11 @@ import (
 )
 
 type FormatterCapabilities struct {
-	Number    bool
-	Currencty bool
-	Date      bool
-	DateTime  bool
-	Time      bool
+	Number   bool
+	Currency bool
+	Date     bool
+	DateTime bool
+	Time     bool
 }
 
 type FormatterProvider func(locale string) map[string]any
@@ -283,7 +283,7 @@ func (r *FormatterRegistry) FuncMap(locale string) map[string]any {
 	result := make(map[string]any, len(r.defaults))
 	maps.Copy(result, r.defaults)
 
-	for _, candidate := range r.candiateLocales(locale) {
+	for _, candidate := range r.candidateLocales(locale) {
 		if r.typed != nil {
 			if provider := r.typed[candidate]; provider != nil {
 				maps.Copy(result, provider.FuncMap())
@@ -308,7 +308,7 @@ func (r *FormatterRegistry) FuncMap(locale string) map[string]any {
 	return result
 }
 
-func (r *FormatterRegistry) candiateLocales(locale string) []string {
+func (r *FormatterRegistry) candidateLocales(locale string) []string {
 	if locale == "" {
 		return nil
 	}
@@ -322,6 +322,7 @@ func (r *FormatterRegistry) candiateLocales(locale string) []string {
 			chain = append(chain, parent)
 		}
 	}
+
 	return chain
 }
 
@@ -339,6 +340,7 @@ func (r *FormatterRegistry) seedFallbacks() {
 		if existing := resolver.Resolve(locale); len(existing) > 0 {
 			continue
 		}
+
 		if parents := deriveLocaleParents(locale); len(parents) > 0 {
 			resolver.Set(locale, parents...)
 		}
@@ -351,7 +353,7 @@ func (r *FormatterRegistry) ensureConfiguredProviders() {
 	}
 
 	r.mu.RLock()
-	defer r.mu.Unlock()
+	defer r.mu.RUnlock()
 
 	for _, locale := range r.locales {
 		if locale == "" {
@@ -365,7 +367,7 @@ func (r *FormatterRegistry) ensureConfiguredProviders() {
 
 func (r *FormatterRegistry) hasProviderLocked(locale string) bool {
 	if r.typed != nil {
-		for _, candidate := range r.candiateLocales(locale) {
+		for _, candidate := range r.candidateLocales(locale) {
 			if provider := r.typed[candidate]; provider != nil {
 				return true
 			}
@@ -376,11 +378,12 @@ func (r *FormatterRegistry) hasProviderLocked(locale string) bool {
 		return false
 	}
 
-	for _, candidate := range r.candiateLocales(locale) {
+	for _, candidate := range r.candidateLocales(locale) {
 		if provider := r.providers[candidate]; provider != nil {
 			return true
 		}
 	}
+
 	return false
 }
 
