@@ -21,6 +21,30 @@ type HelperConfig struct {
 	TemplateHelperKey string
 }
 
+type defaultLocaleProvider interface {
+	DefaultLocale() string
+}
+
+func determineDefaultFormatterLocale(t Translator, registry *FormatterRegistry) string {
+	if provider, ok := t.(defaultLocaleProvider); ok {
+		if locale := provider.DefaultLocale(); locale != "" {
+			return locale
+		}
+	}
+
+	if registry != nil {
+		if locale := registry.defaultLocale(); locale != "" {
+			return locale
+		}
+	}
+
+	if len(defaultFormatterLocales) > 0 {
+		return defaultFormatterLocales[0]
+	}
+
+	return ""
+}
+
 // TemplateHelpers exposes translator + formatter helpers for go-template
 func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 	registry := cfg.Registry
@@ -92,11 +116,21 @@ func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 		return resolveLocale(localeSrc, cfg.LocaleKey)
 	}
 
-	for name, fn := range registry.FuncMap("") {
+	defaultLocale := determineDefaultFormatterLocale(t, registry)
+
+	helpers["formatter_funcs"] = func(localeSrc any) map[string]any {
+		locale := resolveLocale(localeSrc, cfg.LocaleKey)
+		if locale == "" {
+			locale = defaultLocale
+		}
+		return registry.FuncMap(locale)
+	}
+
+	for name, fn := range registry.FuncMap(defaultLocale) {
 		if fn == nil {
 			continue
 		}
-		helpers[name] = wrapFormatter(registry, name, fn)
+		helpers[name] = wrapFormatter(registry, defaultLocale, name, fn)
 	}
 
 	return helpers
@@ -119,7 +153,6 @@ func (h helperCall) optionArgs() []any {
 	if !h.hasCount {
 		return nil
 	}
-
 	return []any{WithCount(h.count)}
 }
 
@@ -135,6 +168,7 @@ func prepareTranslateCall(params ...any) helperCall {
 			}
 			continue
 		}
+
 		call.args = append(call.args, param)
 	}
 
@@ -155,6 +189,7 @@ func executeTemplateTranslation(t Translator, locale, key string, call helperCal
 	if mt, ok := t.(metadataTranslator); ok {
 		return mt.TranslateWithMetadata(locale, key, args...)
 	}
+
 	result, err := t.Translate(locale, key, args...)
 	return result, nil, err
 }
@@ -169,6 +204,7 @@ func extractCountOption(param any) (any, bool) {
 	if !exists {
 		return nil, false
 	}
+
 	return value, true
 }
 
@@ -177,12 +213,15 @@ func removeKnownOptions(param any, keys ...string) any {
 	if !ok {
 		return param
 	}
+
 	for _, key := range keys {
 		delete(clone, key)
 	}
+
 	if len(clone) == 0 {
 		return nil
 	}
+
 	return clone
 }
 
@@ -299,7 +338,7 @@ func resolveLocale(src any, key string) string {
 	return ""
 }
 
-func wrapFormatter(registry *FormatterRegistry, name string, base any) any {
+func wrapFormatter(registry *FormatterRegistry, defaultLocale, name string, base any) any {
 	baseValue := reflect.ValueOf(base)
 	if !baseValue.IsValid() || baseValue.Kind() != reflect.Func {
 		return base
@@ -311,6 +350,9 @@ func wrapFormatter(registry *FormatterRegistry, name string, base any) any {
 		locale := ""
 		if len(args) > 0 && args[0].Kind() == reflect.String {
 			locale = args[0].String()
+		}
+		if locale == "" {
+			locale = defaultLocale
 		}
 
 		impl, ok := registry.Formatter(name, locale)

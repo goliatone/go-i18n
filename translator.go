@@ -169,6 +169,13 @@ func (t *SimpleTranslator) Translate(locale, key string, args ...any) (string, e
 	return result, err
 }
 
+func (t *SimpleTranslator) DefaultLocale() string {
+	if t == nil {
+		return ""
+	}
+	return t.defaultLocale
+}
+
 func (t *SimpleTranslator) TranslateWithMetadata(locale, key string, args ...any) (string, map[string]any, error) {
 	if t == nil {
 		return "", nil, ErrMissingTranslation

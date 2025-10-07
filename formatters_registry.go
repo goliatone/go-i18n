@@ -111,6 +111,7 @@ type FormatterRegistry struct {
 	overrides map[string]map[string]any
 	providers map[string]FormatterProvider
 	globals   map[string]any
+	funcCache map[string]map[string]any
 	resolver  FallbackResolver
 	locales   []string
 	typed     map[string]TypedFormatterProvider
@@ -249,6 +250,7 @@ func (r *FormatterRegistry) Register(name string, fn any) {
 		r.globals = make(map[string]any)
 	}
 	r.globals[name] = fn
+	r.invalidateFuncCacheLocked()
 }
 
 // RegisterLocale registers a locale specific ovveride for the <name> helper
@@ -271,6 +273,7 @@ func (r *FormatterRegistry) RegisterLocale(locale, name string, fn any) {
 		r.overrides[locale] = helpers
 	}
 	helpers[name] = fn
+	r.invalidateFuncCacheLocked()
 }
 
 func (r *FormatterRegistry) RegisterProvider(locale string, provider FormatterProvider) {
@@ -286,6 +289,7 @@ func (r *FormatterRegistry) RegisterProvider(locale string, provider FormatterPr
 	}
 
 	r.providers[locale] = provider
+	r.invalidateFuncCacheLocked()
 }
 
 func (r *FormatterRegistry) RegisterTypedProvider(locale string, provider TypedFormatterProvider) {
@@ -321,6 +325,7 @@ func (r *FormatterRegistry) RegisterTypedProvider(locale string, provider TypedF
 		maps.Copy(result, combined.FuncMap())
 		return result
 	}
+	r.invalidateFuncCacheLocked()
 }
 
 // Formatter returns the helper implementation for the given name and locale
@@ -329,86 +334,95 @@ func (r *FormatterRegistry) Formatter(name, locale string) (any, bool) {
 		return nil, false
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for _, candidate := range r.candidateLocales(locale) {
-		if fn := r.lookupLocaleLocked(name, candidate); fn != nil {
+	funcs := r.funcMapForLocale(locale)
+	if funcs != nil {
+		if fn, ok := funcs[name]; ok && fn != nil {
 			return fn, true
 		}
 	}
 
-	fn, ok := r.defaults[name]
-	return fn, ok
+	if r.defaults != nil {
+		if fn, ok := r.defaults[name]; ok {
+			return fn, true
+		}
+	}
+
+	return nil, false
 }
 
-func (r *FormatterRegistry) lookupLocaleLocked(name, locale string) any {
-	if r.overrides != nil {
-		if helpers, ok := r.overrides[locale]; ok {
-			if fn, ok := helpers[name]; ok {
-				return fn
+// FUncMap returns all helper functions applicable to the locale
+func (r *FormatterRegistry) FuncMap(locale string) map[string]any {
+	return cloneFuncMap(r.funcMapForLocale(locale))
+}
+
+func (r *FormatterRegistry) funcMapForLocale(locale string) map[string]any {
+	key := locale
+
+	r.mu.RLock()
+	if r.funcCache != nil {
+		if cached, ok := r.funcCache[key]; ok {
+			r.mu.RUnlock()
+			return cached
+		}
+	}
+	r.mu.RUnlock()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.funcCache == nil {
+		r.funcCache = make(map[string]map[string]any)
+	} else if cached, ok := r.funcCache[key]; ok {
+		return cached
+	}
+
+	effective := locale
+	if effective == "" {
+		effective = r.defaultLocale()
+	}
+
+	result := make(map[string]any, len(r.defaults))
+	if len(r.defaults) > 0 {
+		maps.Copy(result, r.defaults)
+	}
+
+	if effective != "" {
+		for _, candidate := range r.candidateLocales(effective) {
+			if r.typed != nil {
+				if provider := r.typed[candidate]; provider != nil {
+					maps.Copy(result, provider.FuncMap())
+				}
+			}
+
+			if r.providers != nil {
+				if provider, ok := r.providers[candidate]; ok && provider != nil {
+					if helpers := provider(candidate); helpers != nil {
+						maps.Copy(result, helpers)
+					}
+				}
+			}
+
+			if r.overrides != nil {
+				if helpers, ok := r.overrides[candidate]; ok {
+					maps.Copy(result, helpers)
+				}
 			}
 		}
 	}
 
 	if r.globals != nil {
-		if fn, ok := r.globals[name]; ok {
-			return fn
-		}
+		maps.Copy(result, r.globals)
 	}
 
-	if r.providers != nil {
-		if provider, ok := r.providers[locale]; ok && provider != nil {
-			if helpers := provider(locale); helpers != nil {
-				if fn, ok := helpers[name]; ok {
-					return fn
-				}
-			}
-		}
-	}
-
-	if r.typed != nil {
-		if provider := r.typed[locale]; provider != nil {
-			if fn, ok := provider.Formatter(name); ok {
-				return fn
-			}
-		}
-	}
-
-	return nil
+	r.funcCache[key] = result
+	return result
 }
 
-// FUncMap returns all helper functions applicable to the locale
-func (r *FormatterRegistry) FuncMap(locale string) map[string]any {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	result := make(map[string]any, len(r.defaults))
-	maps.Copy(result, r.defaults)
-
-	for _, candidate := range r.candidateLocales(locale) {
-		if r.typed != nil {
-			if provider := r.typed[candidate]; provider != nil {
-				maps.Copy(result, provider.FuncMap())
-			}
-		}
-
-		if r.providers != nil {
-			if provider, ok := r.providers[candidate]; ok && provider != nil {
-				if helpers := provider(candidate); helpers != nil {
-					maps.Copy(result, helpers)
-				}
-			}
-		}
-
-		if r.overrides != nil {
-			if helpers, ok := r.overrides[candidate]; ok {
-				maps.Copy(result, helpers)
-			}
-		}
+func (r *FormatterRegistry) invalidateFuncCacheLocked() {
+	if r == nil {
+		return
 	}
-
-	return result
+	r.funcCache = nil
 }
 
 func (r *FormatterRegistry) candidateLocales(locale string) []string {
@@ -531,4 +545,20 @@ func cloneFuncMap(source map[string]any) map[string]any {
 		target[key] = value
 	}
 	return target
+}
+
+func (r *FormatterRegistry) defaultLocale() string {
+	if r == nil {
+		return ""
+	}
+
+	if len(r.locales) > 0 {
+		return r.locales[0]
+	}
+
+	if len(defaultFormatterLocales) > 0 {
+		return defaultFormatterLocales[0]
+	}
+
+	return ""
 }

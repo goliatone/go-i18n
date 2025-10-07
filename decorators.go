@@ -220,3 +220,14 @@ func (t *HookedTranslator) Translate(locale, key string, args ...any) (string, e
 
 	return result, err
 }
+
+func (t *HookedTranslator) DefaultLocale() string {
+	if t == nil || t.next == nil {
+		return ""
+	}
+
+	if provider, ok := t.next.(defaultLocaleProvider); ok {
+		return provider.DefaultLocale()
+	}
+	return ""
+}
