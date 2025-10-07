@@ -237,14 +237,6 @@ func (r *FormatterRegistry) Formatter(name, locale string) (any, bool) {
 	defer r.mu.Unlock()
 
 	for _, candidate := range r.candidateLocales(locale) {
-		if r.typed != nil {
-			if provider := r.typed[candidate]; provider != nil {
-				if fn, ok := provider.Formatter(name); ok {
-					return fn, true
-				}
-			}
-		}
-
 		if fn := r.lookupLocaleLocked(name, candidate); fn != nil {
 			return fn, true
 		}
@@ -272,6 +264,15 @@ func (r *FormatterRegistry) lookupLocaleLocked(name, locale string) any {
 			}
 		}
 	}
+
+	if r.typed != nil {
+		if provider := r.typed[locale]; provider != nil {
+			if fn, ok := provider.Formatter(name); ok {
+				return fn
+			}
+		}
+	}
+
 	return nil
 }
 
