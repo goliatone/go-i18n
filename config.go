@@ -16,6 +16,10 @@ type Config struct {
 	Hooks         []TranslationHook
 	enablePlural  bool
 	pluralRules   []string
+
+	formatterLocales   []string
+	formatterProviders map[string]FormatterProvider
+	formatterRegistry  *FormatterRegistry
 }
 
 type pluralRuleLoader interface {
@@ -130,6 +134,32 @@ func WithFormatter(formatter Formatter) Option {
 	}
 }
 
+func WithFormatterLocales(locales ...string) Option {
+	return func(c *Config) error {
+		if len(locales) == 0 {
+			return nil
+		}
+		c.formatterLocales = append(c.formatterLocales, locales...)
+		c.formatterLocales = normalizeLocales(c.formatterLocales)
+		c.formatterRegistry = nil
+		return nil
+	}
+}
+
+func WithFormatterProvider(locale string, provider FormatterProvider) Option {
+	return func(c *Config) error {
+		if locale == "" || provider == nil {
+			return nil
+		}
+		if c.formatterProviders == nil {
+			c.formatterProviders = make(map[string]FormatterProvider)
+		}
+		c.formatterProviders[locale] = provider
+		c.formatterRegistry = nil
+		return nil
+	}
+}
+
 func WithTranslatorHooks(hooks ...TranslationHook) Option {
 	return func(c *Config) error {
 		for _, hook := range hooks {
@@ -142,7 +172,7 @@ func WithTranslatorHooks(hooks ...TranslationHook) Option {
 	}
 }
 
-// EnablePluralization wires pluralization defaults, optionally registering CLDR rule fixtures via loader aware options
+// EnablePluralization wires pluralization defaults, optionally registering CLDR rule fixtures via loader aware options.
 func EnablePluralization(rulePaths ...string) Option {
 	return func(c *Config) error {
 		c.enablePlural = true
@@ -173,6 +203,7 @@ func (cfg *Config) BuildTranslator() (Translator, error) {
 	}
 
 	cfg.seedResolverFallbacks()
+	cfg.ensureFormatterRegistry()
 
 	return translator, nil
 }
@@ -197,6 +228,24 @@ func (cfg *Config) normalizeLocales() {
 	}
 	sort.Strings(dedeped)
 	cfg.Locales = dedeped
+}
+
+func (cfg *Config) FormatterRegistry() *FormatterRegistry {
+	if cfg == nil {
+		return nil
+	}
+	cfg.ensureFormatterRegistry()
+	return cfg.formatterRegistry
+}
+
+func (cfg *Config) TemplateHelpers(t Translator, helperCfg HelperConfig) map[string]any {
+	if cfg == nil {
+		return TemplateHelpers(t, helperCfg)
+	}
+	if helperCfg.Registry == nil {
+		helperCfg.Registry = cfg.FormatterRegistry()
+	}
+	return TemplateHelpers(t, helperCfg)
 }
 
 func (cfg *Config) applyPluralRuleOptions() {
@@ -256,6 +305,38 @@ func (cfg *Config) seedResolverFallbacks() {
 		}
 		resolver.Set(locale, chain...)
 	}
+}
+
+func (cfg *Config) ensureFormatterRegistry() {
+	if cfg == nil || cfg.formatterRegistry != nil {
+		return
+	}
+
+	locales := append([]string{}, defaultFormatterLocales...)
+	if len(cfg.formatterLocales) > 0 {
+		locales = append(locales, cfg.formatterLocales...)
+	}
+	locales = normalizeLocales(locales)
+
+	if cfg.Resolver == nil {
+		cfg.Resolver = NewStaticFallbackResolver()
+	}
+
+	options := []FormatterRegistryOption{
+		WithFormatterRegistryResolver(cfg.Resolver),
+		WithFormatterRegistryLocales(locales...),
+	}
+
+	if len(cfg.formatterProviders) > 0 {
+		for locale, provider := range cfg.formatterProviders {
+			if locale == "" || provider == nil {
+				continue
+			}
+			options = append(options, WithFormatterRegistryProvider(locale, provider))
+		}
+	}
+
+	cfg.formatterRegistry = NewFormatterRegistry(options...)
 }
 
 func deriveLocaleParents(locale string) []string {
