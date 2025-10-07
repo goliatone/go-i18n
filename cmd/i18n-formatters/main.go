@@ -175,7 +175,7 @@ func loadCLDR(path string) (*cldr.CLDR, error) {
 	}
 
 	var decoder cldr.Decoder
-	decoder.SetSectionFilter("main", "supplemental")
+	decoder.SetDirFilter("main", "supplemental")
 
 	data, err := decoder.DecodePath(path)
 	if err != nil {
