@@ -19,14 +19,14 @@ var (
 )
 
 type PageData struct {
-	Locale      string
-	Title       string
-	UserName    string
-	ItemCount   int
-	OrderDate   time.Time
-	CartTotal   float64
-	Completion  float64
-	CartWeight  float64
+	Locale     string
+	Title      string
+	UserName   string
+	ItemCount  int
+	OrderDate  time.Time
+	CartTotal  float64
+	Completion float64
+	CartWeight float64
 }
 
 func main() {
@@ -107,14 +107,14 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	cartWeight := 2.75
 
 	data := PageData{
-		Locale:      locale,
-		Title:       title,
-		UserName:    "Guest",
-		ItemCount:   3,
-		OrderDate:   orderDate,
-		CartTotal:   cartTotal,
-		Completion:  0.42,
-		CartWeight:  cartWeight,
+		Locale:     locale,
+		Title:      title,
+		UserName:   "Guest",
+		ItemCount:  3,
+		OrderDate:  orderDate,
+		CartTotal:  cartTotal,
+		Completion: 0.42,
+		CartWeight: cartWeight,
 	}
 
 	log.Printf("render locale=%s", locale)
