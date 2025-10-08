@@ -90,8 +90,63 @@ func TestFormatList(t *testing.T) {
 }
 
 func TestFormatPhone(t *testing.T) {
-	if got := FormatPhone("en", "+123456789"); got != "+123456789" {
-		t.Fatalf("FormatPhone = %q", got)
+	t.Helper()
+
+	cases := []struct {
+		name   string
+		locale string
+		input  string
+		want   string
+	}{
+		{
+			name:   "US with leading country code",
+			locale: "en",
+			input:  "+14155552678",
+			want:   "+1 415 555 2678",
+		},
+		{
+			name:   "US without country code",
+			locale: "en",
+			input:  "4155552678",
+			want:   "+1 415 555 2678",
+		},
+		{
+			name:   "Spain national number",
+			locale: "es",
+			input:  "912345678",
+			want:   "+34 912 345 678",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FormatPhone(tc.locale, tc.input); got != tc.want {
+				t.Fatalf("FormatPhone(%s, %s) = %q, want %q", tc.locale, tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRegisterPhoneDialPlan(t *testing.T) {
+	RegisterPhoneDialPlan("fr", PhoneDialPlan{
+		CountryCode:    "33",
+		NationalPrefix: "0",
+		Groups:         []int{1, 2, 2, 2, 2},
+	})
+
+	if got := FormatPhone("fr", "0123456789"); got != "+33 1 23 45 67 89" {
+		t.Fatalf("FormatPhone with custom dial plan = %q", got)
+	}
+}
+
+func TestRegisterPhoneFormatter(t *testing.T) {
+	RegisterPhoneFormatter("xx", func(locale, raw string) string {
+		return locale + ":" + raw
+	})
+
+	if got := FormatPhone("xx", "123"); got != "xx:123" {
+		t.Fatalf("FormatPhone with custom formatter = %q", got)
 	}
 }
 
