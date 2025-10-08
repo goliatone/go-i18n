@@ -1,8 +1,11 @@
 package i18n
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFormatterRegistryProvider(t *testing.T) {
@@ -244,4 +247,312 @@ func (p *stubTypedProvider) Capabilities() FormatterCapabilities {
 		return FormatterCapabilities{}
 	}
 	return p.caps
+}
+
+// Fixture helpers for regression tests
+
+type FormatterTestCase struct {
+	Locale   string  `json:"locale"`
+	Date     string  `json:"date"` // RFC3339 format
+	Amount   float64 `json:"amount"`
+	Currency string  `json:"currency"`
+	Value    float64 `json:"value"`
+	Unit     string  `json:"unit"`
+}
+
+type FormatterExpected struct {
+	Date        string `json:"date"`
+	Currency    string `json:"currency"`
+	Measurement string `json:"measurement"`
+}
+
+func loadFormatterFixture(t *testing.T, path string) FormatterTestCase {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("load fixture %s: %v", path, err)
+	}
+	var tc FormatterTestCase
+	if err := json.Unmarshal(data, &tc); err != nil {
+		t.Fatalf("parse fixture %s: %v", path, err)
+	}
+	return tc
+}
+
+func loadFormatterExpected(t *testing.T, path string) FormatterExpected {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("load expected %s: %v", path, err)
+	}
+	var expected FormatterExpected
+	if err := json.Unmarshal(data, &expected); err != nil {
+		t.Fatalf("parse expected %s: %v", path, err)
+	}
+	return expected
+}
+
+// Regression tests for Spanish locale formatting bug
+
+func TestFormatterRegistry_SpanishDateFormatting(t *testing.T) {
+	tests := []struct {
+		name         string
+		locale       string
+		fixtureInput string
+		fixtureWant  string
+	}{
+		{
+			name:         "es_locale_date",
+			locale:       "es",
+			fixtureInput: "testdata/formatter_contracts/es_date_input.json",
+			fixtureWant:  "testdata/formatter_contracts/es_date_expected.json",
+		},
+		{
+			name:         "es_MX_locale_date",
+			locale:       "es-MX",
+			fixtureInput: "testdata/formatter_contracts/es_date_input.json",
+			fixtureWant:  "testdata/formatter_contracts/es_MX_date_expected.json",
+		},
+		{
+			name:         "el_locale_date_fallback",
+			locale:       "el",
+			fixtureInput: "testdata/formatter_contracts/es_date_input.json",
+			fixtureWant:  "testdata/formatter_contracts/el_date_expected.json",
+		},
+		{
+			name:         "ar_locale_date_fallback",
+			locale:       "ar",
+			fixtureInput: "testdata/formatter_contracts/es_date_input.json",
+			fixtureWant:  "testdata/formatter_contracts/ar_date_expected.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup registry with resolver
+			resolver := NewStaticFallbackResolver()
+			resolver.Set("es", "en")
+			resolver.Set("es-MX", "es", "en")
+			resolver.Set("el", "en")
+			resolver.Set("ar", "en")
+
+			registry := NewFormatterRegistry(
+				WithFormatterRegistryResolver(resolver),
+				WithFormatterRegistryLocales("en", "es", "es-MX", "el", "ar"),
+			)
+
+			// Load fixtures
+			input := loadFormatterFixture(t, tt.fixtureInput)
+			want := loadFormatterExpected(t, tt.fixtureWant)
+
+			// Parse date
+			dateTime, err := time.Parse(time.RFC3339, input.Date)
+			if err != nil {
+				t.Fatalf("parse date: %v", err)
+			}
+
+			// Get formatter from registry
+			funcMap := registry.FuncMap(tt.locale)
+			formatDate, ok := funcMap["format_date"].(func(string, time.Time) string)
+			if !ok {
+				t.Fatalf("format_date not found or wrong type")
+			}
+
+			// Execute
+			got := formatDate(tt.locale, dateTime)
+
+			// Compare
+			if got != want.Date {
+				t.Errorf("format_date(%q, %v) = %q; want %q", tt.locale, dateTime, got, want.Date)
+			}
+		})
+	}
+}
+
+func TestFormatterRegistry_SpanishCurrencyFormatting(t *testing.T) {
+	tests := []struct {
+		name         string
+		locale       string
+		fixtureInput string
+		fixtureWant  string
+	}{
+		{
+			name:         "es_locale_currency",
+			locale:       "es",
+			fixtureInput: "testdata/formatter_contracts/es_currency_input.json",
+			fixtureWant:  "testdata/formatter_contracts/es_currency_expected.json",
+		},
+		{
+			name:         "es_MX_locale_currency",
+			locale:       "es-MX",
+			fixtureInput: "testdata/formatter_contracts/es_currency_input.json",
+			fixtureWant:  "testdata/formatter_contracts/es_MX_currency_expected.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup registry with resolver
+			resolver := NewStaticFallbackResolver()
+			resolver.Set("es", "en")
+			resolver.Set("es-MX", "es", "en")
+
+			registry := NewFormatterRegistry(
+				WithFormatterRegistryResolver(resolver),
+				WithFormatterRegistryLocales("en", "es", "es-MX"),
+			)
+
+			// Load fixtures
+			input := loadFormatterFixture(t, tt.fixtureInput)
+			want := loadFormatterExpected(t, tt.fixtureWant)
+
+			// Get formatter from registry
+			funcMap := registry.FuncMap(tt.locale)
+			formatCurrency, ok := funcMap["format_currency"].(func(string, float64, string) string)
+			if !ok {
+				t.Fatalf("format_currency not found or wrong type")
+			}
+
+			// Execute
+			got := formatCurrency(tt.locale, input.Amount, input.Currency)
+
+			// Compare
+			if got != want.Currency {
+				t.Errorf("format_currency(%q, %.2f, %q) = %q; want %q", tt.locale, input.Amount, input.Currency, got, want.Currency)
+			}
+		})
+	}
+}
+
+func TestFormatterRegistry_SpanishMeasurementFormatting(t *testing.T) {
+	tests := []struct {
+		name         string
+		locale       string
+		fixtureInput string
+		fixtureWant  string
+	}{
+		{
+			name:         "es_locale_measurement",
+			locale:       "es",
+			fixtureInput: "testdata/formatter_contracts/es_measurement_input.json",
+			fixtureWant:  "testdata/formatter_contracts/es_measurement_expected.json",
+		},
+		{
+			name:         "es_MX_locale_measurement",
+			locale:       "es-MX",
+			fixtureInput: "testdata/formatter_contracts/es_measurement_input.json",
+			fixtureWant:  "testdata/formatter_contracts/es_MX_measurement_expected.json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup registry with resolver
+			resolver := NewStaticFallbackResolver()
+			resolver.Set("es", "en")
+			resolver.Set("es-MX", "es", "en")
+
+			registry := NewFormatterRegistry(
+				WithFormatterRegistryResolver(resolver),
+				WithFormatterRegistryLocales("en", "es", "es-MX"),
+			)
+
+			// Load fixtures
+			input := loadFormatterFixture(t, tt.fixtureInput)
+			want := loadFormatterExpected(t, tt.fixtureWant)
+
+			// Get formatter from registry
+			funcMap := registry.FuncMap(tt.locale)
+			formatMeasurement, ok := funcMap["format_measurement"].(func(string, float64, string) string)
+			if !ok {
+				t.Fatalf("format_measurement not found or wrong type")
+			}
+
+			// Execute
+			got := formatMeasurement(tt.locale, input.Value, input.Unit)
+
+			// Compare
+			if got != want.Measurement {
+				t.Errorf("format_measurement(%q, %.2f, %q) = %q; want %q", tt.locale, input.Value, input.Unit, got, want.Measurement)
+			}
+		})
+	}
+}
+
+// TestFormatterRegistry_MergeOrder verifies that locale-specific formatters
+// are not overwritten by fallback formatters (merge order bug)
+//
+// EVIDENCE OF BUG (from debug output):
+// When requesting formatters for "es" locale:
+//   1. candidateLocales("es") returns [es en] (es first, then fallback en)
+//   2. funcMapForLocale loops through candidates in order
+//   3. First copies from "es" provider → result["format_date"] = Spanish formatter
+//   4. Then copies from "en" provider → result["format_date"] = English formatter (OVERWRITES!)
+//   5. Final result has English formatter, not Spanish
+//
+// ROOT CAUSE: maps.Copy overwrites existing keys. Since loop iterates [es, en],
+// the en (fallback) provider overwrites the es (specific) provider.
+//
+// EXPECTED: More specific locales should take precedence over fallbacks.
+//
+// DEBUG OUTPUT EXCERPT:
+//   [DEBUG] funcMapForLocale("es") candidates: [es en]
+//   [DEBUG] Copying from typed provider for locale: "es"
+//   [DEBUG] Copying from typed provider for locale: "en"  ← This overwrites "es"
+//   format_date("es", ...) = "October 7, 2025"; want "7 de octubre de 2025"
+//
+func TestFormatterRegistry_MergeOrder(t *testing.T) {
+	// Create test providers that identify themselves
+	createTestProvider := func(locale string, dateFormat string) TypedFormatterProvider {
+		return &testTypedProvider{
+			locale: locale,
+			funcs: map[string]any{
+				"format_date": func(_ string, tm time.Time) string {
+					return "[" + locale + "]:" + dateFormat
+				},
+			},
+		}
+	}
+
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("es", "en")
+
+	registry := NewFormatterRegistry(
+		WithFormatterRegistryResolver(resolver),
+		WithFormatterRegistryLocales("en", "es"),
+		WithFormatterRegistryTypedProvider("en", createTestProvider("en", "EN_FORMAT")),
+		WithFormatterRegistryTypedProvider("es", createTestProvider("es", "ES_FORMAT")),
+	)
+
+	// Test es locale - should get ES_FORMAT, not EN_FORMAT
+	funcMap := registry.FuncMap("es")
+	formatDate := funcMap["format_date"].(func(string, time.Time) string)
+	got := formatDate("es", time.Now())
+
+	if !strings.Contains(got, "ES_FORMAT") {
+		t.Errorf("Expected es provider format, got: %q (indicates en provider overwriting es)", got)
+	}
+
+	if strings.Contains(got, "EN_FORMAT") {
+		t.Errorf("Got en provider format for es locale: %q (confirms merge order bug)", got)
+	}
+}
+
+type testTypedProvider struct {
+	locale string
+	funcs  map[string]any
+}
+
+func (p *testTypedProvider) Formatter(name string) (any, bool) {
+	fn, ok := p.funcs[name]
+	return fn, ok
+}
+
+func (p *testTypedProvider) FuncMap() map[string]any {
+	// Use the existing cloneFuncMap from formatters_registry.go
+	return cloneFuncMap(p.funcs)
+}
+
+func (p *testTypedProvider) Capabilities() FormatterCapabilities {
+	return FormatterCapabilities{}
 }
