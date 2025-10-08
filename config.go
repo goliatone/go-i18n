@@ -2,15 +2,16 @@ package i18n
 
 // Config captures translator and formatter setup
 type Config struct {
-	DefaultLocale string
-	Locales       []string
-	Loader        Loader
-	Store         Store
-	Resolver      FallbackResolver
-	Formatter     Formatter
-	Hooks         []TranslationHook
-	enablePlural  bool
-	pluralRules   []string
+	DefaultLocale       string
+	Locales             []string
+	Loader              Loader
+	Store               Store
+	Resolver            FallbackResolver
+	Formatter           Formatter
+	Hooks               []TranslationHook
+	enablePlural        bool
+	pluralRules         []string
+	seedPluralFallbacks bool
 
 	formatterLocales   []string
 	formatterProviders map[string]FormatterProvider
@@ -182,6 +183,14 @@ func EnablePluralization(rulePaths ...string) Option {
 	}
 }
 
+// EnablePluralFallbackSeeding opts into automatic fallback chain seeding when pluralization is enabled.
+func EnablePluralFallbackSeeding() Option {
+	return func(c *Config) error {
+		c.seedPluralFallbacks = true
+		return nil
+	}
+}
+
 // WithCultureData configures culture data loading
 func WithCultureData(path string) Option {
 	return func(c *Config) error {
@@ -283,7 +292,7 @@ func (cfg *Config) applyPluralRuleOptions() {
 }
 
 func (cfg *Config) seedResolverFallbacks() {
-	if !cfg.enablePlural {
+	if !cfg.enablePlural || !cfg.seedPluralFallbacks {
 		return
 	}
 

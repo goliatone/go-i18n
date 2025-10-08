@@ -202,7 +202,7 @@ func TestEnablePluralizationAddsRuleFiles(t *testing.T) {
 	}
 }
 
-func TestEnablePluralizationSeedsParentFallbacks(t *testing.T) {
+func TestEnablePluralizationDoesNotSeedFallbacksByDefault(t *testing.T) {
 	rulePath := filepath.Join("testdata", "cldr_cardinal.json")
 	loader := NewFileLoader(filepath.Join("testdata", "loader_en.json"))
 
@@ -211,6 +211,36 @@ func TestEnablePluralizationSeedsParentFallbacks(t *testing.T) {
 		WithLocales("en-US", "en"),
 		WithDefaultLocale("en-US"),
 		EnablePluralization(rulePath),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	if _, err := cfg.BuildTranslator(); err != nil {
+		t.Fatalf("BuildTranslator: %v", err)
+	}
+
+	resolver, ok := cfg.Resolver.(*StaticFallbackResolver)
+	if !ok {
+		t.Fatalf("expected StaticFallbackResolver, got %[1]T", cfg.Resolver)
+	}
+
+	chain := resolver.Resolve("en-US")
+	if len(chain) != 0 {
+		t.Fatalf("expected no fallback chain, got %#v", chain)
+	}
+}
+
+func TestEnablePluralizationSeedsParentFallbacksWhenOptedIn(t *testing.T) {
+	rulePath := filepath.Join("testdata", "cldr_cardinal.json")
+	loader := NewFileLoader(filepath.Join("testdata", "loader_en.json"))
+
+	cfg, err := NewConfig(
+		WithLoader(loader),
+		WithLocales("en-US", "en"),
+		WithDefaultLocale("en-US"),
+		EnablePluralization(rulePath),
+		EnablePluralFallbackSeeding(),
 	)
 	if err != nil {
 		t.Fatalf("NewConfig: %v", err)
