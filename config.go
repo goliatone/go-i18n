@@ -20,6 +20,10 @@ type Config struct {
 	formatterLocales   []string
 	formatterProviders map[string]FormatterProvider
 	formatterRegistry  *FormatterRegistry
+
+	cultureDataPath  string
+	cultureOverrides map[string]string
+	cultureService   CultureService
 }
 
 type pluralRuleLoader interface {
@@ -183,6 +187,27 @@ func EnablePluralization(rulePaths ...string) Option {
 	}
 }
 
+// WithCultureData configures culture data loading
+func WithCultureData(path string) Option {
+	return func(c *Config) error {
+		c.cultureDataPath = path
+		c.cultureService = nil // Invalidate cached service
+		return nil
+	}
+}
+
+// WithCultureOverride adds locale-specific culture data override
+func WithCultureOverride(locale, path string) Option {
+	return func(c *Config) error {
+		if c.cultureOverrides == nil {
+			c.cultureOverrides = make(map[string]string)
+		}
+		c.cultureOverrides[locale] = path
+		c.cultureService = nil // Invalidate cached service
+		return nil
+	}
+}
+
 func (cfg *Config) BuildTranslator() (Translator, error) {
 	if cfg == nil {
 		return nil, ErrNotImplemented
@@ -238,6 +263,15 @@ func (cfg *Config) FormatterRegistry() *FormatterRegistry {
 	return cfg.formatterRegistry
 }
 
+// CultureService returns the culture service
+func (cfg *Config) CultureService() CultureService {
+	if cfg == nil {
+		return nil
+	}
+	cfg.ensureCultureService()
+	return cfg.cultureService
+}
+
 func (cfg *Config) TemplateHelpers(t Translator, helperCfg HelperConfig) map[string]any {
 	if cfg == nil {
 		return TemplateHelpers(t, helperCfg)
@@ -245,7 +279,20 @@ func (cfg *Config) TemplateHelpers(t Translator, helperCfg HelperConfig) map[str
 	if helperCfg.Registry == nil {
 		helperCfg.Registry = cfg.FormatterRegistry()
 	}
-	return TemplateHelpers(t, helperCfg)
+
+	// Get base helpers from TemplateHelpers
+	result := TemplateHelpers(t, helperCfg)
+
+	// Add culture helpers if culture service is configured
+	cultureService := cfg.CultureService()
+	if cultureService != nil {
+		cultureHelpers := CultureHelpers(cultureService, helperCfg.LocaleKey)
+		for name, fn := range cultureHelpers {
+			result[name] = fn
+		}
+	}
+
+	return result
 }
 
 func (cfg *Config) applyPluralRuleOptions() {
@@ -322,9 +369,24 @@ func (cfg *Config) ensureFormatterRegistry() {
 		cfg.Resolver = NewStaticFallbackResolver()
 	}
 
+	// Load culture data and create formatting rules provider
+	var cultureData *CultureData
+	if cfg.cultureDataPath != "" {
+		loader := NewCultureDataLoader(cfg.cultureDataPath)
+		for locale, path := range cfg.cultureOverrides {
+			loader.AddOverride(locale, path)
+		}
+		if data, err := loader.Load(); err == nil {
+			cultureData = data
+		}
+	}
+
+	rulesProvider := NewFormattingRulesProvider(cultureData, cfg.Resolver)
+
 	options := []FormatterRegistryOption{
 		WithFormatterRegistryResolver(cfg.Resolver),
 		WithFormatterRegistryLocales(locales...),
+		WithFormattingRulesProvider(rulesProvider),
 	}
 
 	if len(cfg.formatterProviders) > 0 {
@@ -358,4 +420,30 @@ func collapseLocaleParent(locale string) string {
 		return locale[:idx]
 	}
 	return ""
+}
+
+func (cfg *Config) ensureCultureService() {
+	if cfg.cultureService != nil {
+		return
+	}
+
+	if cfg.cultureDataPath == "" {
+		// No culture data configured, use empty service
+		cfg.cultureService = NewCultureService(&CultureData{}, cfg.Resolver)
+		return
+	}
+
+	loader := NewCultureDataLoader(cfg.cultureDataPath)
+	for locale, path := range cfg.cultureOverrides {
+		loader.AddOverride(locale, path)
+	}
+
+	data, err := loader.Load()
+	if err != nil {
+		// Log error but don't fail - use empty service
+		cfg.cultureService = NewCultureService(&CultureData{}, cfg.Resolver)
+		return
+	}
+
+	cfg.cultureService = NewCultureService(data, cfg.Resolver)
 }
