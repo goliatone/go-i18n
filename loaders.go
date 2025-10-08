@@ -186,7 +186,10 @@ func decodeTranslationsYAML(path, input string) (map[string]map[string]Message, 
 			continue
 		}
 
-		indent := leadingSpaces(raw)
+		indent, ok := leadingSpaces(raw)
+		if !ok {
+			return nil, fmt.Errorf("line %d: tabs are not allowed for indentation", idx+1)
+		}
 		switch indent {
 		case 0:
 			if err := flushVariants(); err != nil {
@@ -581,27 +584,6 @@ func inferDomain(key string) string {
 	return "default"
 }
 
-func checksum(input string) string {
-	sum := sha1.Sum([]byte(input))
-	return hex.EncodeToString(sum[:])
-}
-
-func leadingSpaces(input string) int {
-	count := 0
-	for _, ch := range input {
-		if ch == ' ' {
-			count++
-			continue
-		}
-		if ch == '\t' {
-			count += 4
-			continue
-		}
-		break
-	}
-	return count
-}
-
 func splitKeyValue(line string) (string, string, bool) {
 	parts := strings.SplitN(line, ":", 2)
 	if len(parts) != 2 {
@@ -612,13 +594,33 @@ func splitKeyValue(line string) (string, string, bool) {
 	value = strings.TrimPrefix(value, "|")
 	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") && len(value) >= 2 {
-		value = strings.Trim(value, "\"")
+		value = value[1 : len(value)-1]
 	}
 	if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") && len(value) >= 2 {
-		value = strings.Trim(value, "'")
+		value = value[1 : len(value)-1]
 	}
 	if value == "" {
 		return key, value, false
 	}
 	return key, value, true
+}
+
+func checksum(input string) string {
+	sum := sha1.Sum([]byte(input))
+	return hex.EncodeToString(sum[:])
+}
+
+func leadingSpaces(input string) (int, bool) {
+	count := 0
+	for _, ch := range input {
+		if ch == ' ' {
+			count++
+			continue
+		}
+		if ch == '\t' {
+			return 0, false
+		}
+		break
+	}
+	return count, true
 }
