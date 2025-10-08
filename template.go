@@ -66,7 +66,7 @@ func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 		// Create a registry with automatic parent-chain fallback
 		// (e.g., zh-Hant-HK → zh-Hant → zh → [default])
 		registry = NewFormatterRegistry(
-			WithFormatterRegistryResolver(newAutoFallbackResolver(defaultLocale)),
+			WithFormatterRegistryResolver(newLanguageFallbackResolver(defaultLocale)),
 		)
 	}
 
@@ -389,36 +389,30 @@ func wrapFormatter(registry *FormatterRegistry, defaultLocale, name string, base
 	return wrapper.Interface()
 }
 
-// autoFallbackResolver automatically derives the full parent chain
-// from locale tags (e.g., zh-Hant-HK → zh-Hant → zh → [default])
-type autoFallbackResolver struct {
+type languageFallbackResolver struct {
 	defaultLocale string
 }
 
-func newAutoFallbackResolver(defaultLocale string) *autoFallbackResolver {
-	return &autoFallbackResolver{defaultLocale: defaultLocale}
+func newLanguageFallbackResolver(defaultLocale string) *languageFallbackResolver {
+	return &languageFallbackResolver{defaultLocale: defaultLocale}
 }
 
-func (r *autoFallbackResolver) Resolve(locale string) []string {
+func (r *languageFallbackResolver) Resolve(locale string) []string {
 	if locale == "" {
 		return nil
 	}
 
-	// Build full parent chain by successively stripping components
-	// e.g., zh-Hant-HK → zh-Hant → zh
-	chain := deriveLocaleParents(locale)
+	chain := localeParentChain(locale)
 
-	// Add the configured default locale as ultimate fallback
-	// (unless the locale already starts with it)
-	if r.defaultLocale != "" && !strings.HasPrefix(locale, r.defaultLocale) {
-		alreadyHasDefault := false
-		for _, c := range chain {
-			if c == r.defaultLocale || strings.HasPrefix(c, r.defaultLocale) {
-				alreadyHasDefault = true
+	if r.defaultLocale != "" && !strings.EqualFold(locale, r.defaultLocale) {
+		hasDefault := false
+		for _, candidate := range chain {
+			if strings.EqualFold(candidate, r.defaultLocale) {
+				hasDefault = true
 				break
 			}
 		}
-		if !alreadyHasDefault {
+		if !hasDefault {
 			chain = append(chain, r.defaultLocale)
 		}
 	}
