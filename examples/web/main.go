@@ -6,32 +6,36 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/goliatone/go-i18n"
 )
 
 var (
-	translator i18n.Translator
-	tmpl       *template.Template
-	registry   *i18n.FormatterRegistry
+	translator  i18n.Translator
+	tmpl        *template.Template
+	registry    *i18n.FormatterRegistry
+	helperFuncs map[string]any
 )
 
 type PageData struct {
-	Locale         string
-	Title          string
-	UserName       string
-	ItemCount      int
-	OrderDate      time.Time
-	FormattedDate  string
-	CartTotal      float64
-	Currency       string
-	Trending       []string
-	Completion     float64
-	CartWeight     float64
-	CartWeightUnit string
-	SupportLine    string
+	Locale             string
+	Title              string
+	UserName           string
+	ItemCount          int
+	OrderDate          time.Time
+	FormattedDate      string
+	CartTotal          float64
+	Currency           string
+	Trending           []string
+	FormattedTrending  string
+	Completion         float64
+	CartWeight         float64
+	CartWeightUnit     string
+	FormattedCartTotal string
+	FormattedPercent   string
+	FormattedWeight    string
+	SupportLine        string
 }
 
 func main() {
@@ -75,23 +79,8 @@ func setup() error {
 	}
 
 	registry = cfg.FormatterRegistry()
-	trailingCurrency := func(locale string, value float64, currency string) string {
-		currency = strings.TrimSpace(strings.ToUpper(currency))
-		number := i18n.FormatNumber(locale, value, 2)
-		if fnAny, ok := registry.Formatter("format_number", locale); ok {
-			if fn, ok := fnAny.(func(string, float64, int) string); ok {
-				number = fn(locale, value, 2)
-			}
-		}
-		if currency == "" {
-			return number
-		}
-		return fmt.Sprintf("%s %s", number, currency)
-	}
-	registry.RegisterLocale("es", "format_currency", trailingCurrency)
-	registry.RegisterLocale("es-MX", "format_currency", trailingCurrency)
 
-	helpers := cfg.TemplateHelpers(translator, i18n.HelperConfig{
+	helperFuncs = cfg.TemplateHelpers(translator, i18n.HelperConfig{
 		TemplateHelperKey: "t",
 		Registry:          registry,
 		OnMissing: func(locale, key string, args []any, err error) string {
@@ -99,7 +88,7 @@ func setup() error {
 		},
 	})
 
-	tmpl = template.Must(template.New("index.html").Funcs(helpers).ParseFiles(
+	tmpl = template.Must(template.New("index.html").Funcs(helperFuncs).ParseFiles(
 		filepath.Join("templates", "index.html"),
 	))
 
@@ -119,13 +108,6 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	title, _ := translator.Translate(locale, "site.title")
-
-	// Resolve localized formatters via registry (falls back to ISO defaults when missing).
-	formatDateFnAny, ok := registry.Formatter("format_date", locale)
-	if !ok {
-		formatDateFnAny = i18n.FormatDate
-	}
-	formatDateFn, _ := formatDateFnAny.(func(string, time.Time) string)
 
 	currency := map[string]string{
 		"en":    "USD",
@@ -164,27 +146,41 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	orderDate := time.Now()
 
-	data := PageData{
-		Locale:         locale,
-		Title:          title,
-		UserName:       "Guest",
-		ItemCount:      3,
-		OrderDate:      orderDate,
-		FormattedDate:  formatDateFn(locale, orderDate),
-		CartTotal:      129.95,
-		Currency:       currency,
-		Trending:       trending,
-		Completion:     0.42,
-		CartWeight:     2.75,
-		CartWeightUnit: "kg",
-		SupportLine:    support,
-	}
-
+	cartTotal := 129.95
+	cartWeight := 2.75
+	cartWeightUnit := "kg"
 	if locale == "en" {
-		data.CartWeight = data.CartWeight * 2.20462
-		data.CartWeightUnit = "lb"
+		cartWeight = cartWeight * 2.20462
+		cartWeightUnit = "lb"
 	}
 
+	formatDate := helperFuncs["format_date"].(func(string, time.Time) string)
+	formatCurrency := helperFuncs["format_currency"].(func(string, float64, string) string)
+	formatList := helperFuncs["format_list"].(func(string, []string) string)
+	formatPercent := helperFuncs["format_percent"].(func(string, float64, int) string)
+	formatMeasurement := helperFuncs["format_measurement"].(func(string, float64, string) string)
+
+	data := PageData{
+		Locale:             locale,
+		Title:              title,
+		UserName:           "Guest",
+		ItemCount:          3,
+		OrderDate:          orderDate,
+		FormattedDate:      formatDate(locale, orderDate),
+		CartTotal:          cartTotal,
+		Currency:           currency,
+		Trending:           trending,
+		FormattedTrending:  formatList(locale, trending),
+		Completion:         0.42,
+		CartWeight:         cartWeight,
+		CartWeightUnit:     cartWeightUnit,
+		FormattedCartTotal: formatCurrency(locale, cartTotal, currency),
+		FormattedPercent:   formatPercent(locale, 0.42, 2),
+		FormattedWeight:    formatMeasurement(locale, cartWeight, cartWeightUnit),
+		SupportLine:        support,
+	}
+
+	log.Printf("render locale=%s", locale)
 	if err := tmpl.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("Template error: %v", err)

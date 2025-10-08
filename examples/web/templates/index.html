@@ -45,7 +45,7 @@
                     <h3>{{t .Locale "nav.contact"}}</h3>
                     {{$items := translate_count .Locale "items.count" .ItemCount}}
                     <p>{{$items.text}}</p>
-                    <p class="date">{{t .Locale "date.today" (format_date .Locale .OrderDate)}}</p>
+                    <p class="date">{{t .Locale "date.today" .FormattedDate}}</p>
                 </div>
             </section>
 
@@ -54,11 +54,11 @@
                 <ul>
                     <li><strong>Current Locale:</strong> {{.Locale}}</li>
                     <li><strong>User Name:</strong> {{.UserName}}</li>
-                    <li><strong>{{t .Locale "demo.date"}}:</strong> {{format_date .Locale .OrderDate}}</li>
-                    <li><strong>{{t .Locale "demo.list"}}:</strong> {{format_list .Locale .Trending}}</li>
-                    <li><strong>{{t .Locale "demo.total"}}:</strong> {{format_currency .Locale .CartTotal .Currency}}</li>
-                    <li><strong>{{t .Locale "demo.percent"}}:</strong> {{format_percent .Locale .Completion 1}}</li>
-                    <li><strong>{{t .Locale "demo.measurement"}}:</strong> {{format_measurement .Locale .CartWeight .CartWeightUnit}}</li>
+                    <li><strong>{{t .Locale "demo.date"}}:</strong> {{.FormattedDate}}</li>
+                    <li><strong>{{t .Locale "demo.list"}}:</strong> {{.FormattedTrending}}</li>
+                    <li><strong>{{t .Locale "demo.total"}}:</strong> {{.FormattedCartTotal}}</li>
+                    <li><strong>{{t .Locale "demo.percent"}}:</strong> {{.FormattedPercent}}</li>
+                    <li><strong>{{t .Locale "demo.measurement"}}:</strong> {{.FormattedWeight}}</li>
                     <li><strong>{{t .Locale "demo.phone"}}:</strong> {{format_phone .Locale .SupportLine}}</li>
                 </ul>
             </section>
