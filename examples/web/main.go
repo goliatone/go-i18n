@@ -123,7 +123,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	// Resolve localized formatters via registry (falls back to ISO defaults when missing).
 	formatDateFnAny, ok := registry.Formatter("format_date", locale)
 	if !ok {
-		formatDateFnAny = FormatDate
+		formatDateFnAny = i18n.FormatDate
 	}
 	formatDateFn, _ := formatDateFnAny.(func(string, time.Time) string)
 
