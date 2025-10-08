@@ -63,8 +63,8 @@ func (l *CultureDataLoader) AddOverride(locale, path string) {
 	l.overrides[locale] = path
 }
 
-// mergeCultureData merges source into dest (source takes precedence)
-func (l *CultureDataLoader) mergeCultureData(dest, source *CultureData) {
+// mergeCultureDataInto merges source into dest (source takes precedence)
+func mergeCultureDataInto(dest, source *CultureData) {
 	if source.CurrencyCodes != nil {
 		if dest.CurrencyCodes == nil {
 			dest.CurrencyCodes = make(map[string]string)
@@ -116,6 +116,11 @@ func (l *CultureDataLoader) mergeCultureData(dest, source *CultureData) {
 	}
 }
 
+// mergeCultureData merges source into dest (source takes precedence)
+func (l *CultureDataLoader) mergeCultureData(dest, source *CultureData) {
+	mergeCultureDataInto(dest, source)
+}
+
 // loadOverride loads and merges a locale-specific override file
 func (l *CultureDataLoader) loadOverride(base *CultureData, locale, path string) error {
 	data, err := os.ReadFile(path)
@@ -129,55 +134,7 @@ func (l *CultureDataLoader) loadOverride(base *CultureData, locale, path string)
 	}
 
 	// Merge override data into base
-	if override.CurrencyCodes != nil {
-		if base.CurrencyCodes == nil {
-			base.CurrencyCodes = make(map[string]string)
-		}
-		for k, v := range override.CurrencyCodes {
-			base.CurrencyCodes[k] = v
-		}
-	}
-
-	if override.SupportNumbers != nil {
-		if base.SupportNumbers == nil {
-			base.SupportNumbers = make(map[string]string)
-		}
-		for k, v := range override.SupportNumbers {
-			base.SupportNumbers[k] = v
-		}
-	}
-
-	if override.Lists != nil {
-		if base.Lists == nil {
-			base.Lists = make(map[string]map[string][]string)
-		}
-		for listName, localeMap := range override.Lists {
-			if base.Lists[listName] == nil {
-				base.Lists[listName] = make(map[string][]string)
-			}
-			for loc, list := range localeMap {
-				base.Lists[listName][loc] = list
-			}
-		}
-	}
-
-	if override.MeasurementPreferences != nil {
-		if base.MeasurementPreferences == nil {
-			base.MeasurementPreferences = make(map[string]MeasurementPrefs)
-		}
-		for k, v := range override.MeasurementPreferences {
-			base.MeasurementPreferences[k] = v
-		}
-	}
-
-	if override.FormattingRules != nil {
-		if base.FormattingRules == nil {
-			base.FormattingRules = make(map[string]FormattingRules)
-		}
-		for k, v := range override.FormattingRules {
-			base.FormattingRules[k] = v
-		}
-	}
+	mergeCultureDataInto(base, &override)
 
 	return nil
 }
