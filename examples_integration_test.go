@@ -76,6 +76,6 @@ Conteo: {{format_number $locale .ItemCount 0}}
 	assertContains("Resumen de pedido para Lucía")
 	assertContains("Fecha: 15 de mayo de 2024")
 	assertContains("Lista: uno, dos y tres")
-	assertContains("Total: MXN 1.234,56")
+	assertContains("Total: 1.234,56 MXN")
 	assertContains("Conteo: 3")
 }

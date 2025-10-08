@@ -32,7 +32,7 @@ func TestXTextProvider_DataDriven_DateFormatting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			provider := newXTextProvider(tt.locale)
+			provider := newXTextProvider(tt.locale, nil)
 			got := provider.formatDate(tt.locale, tt.date)
 			if got != tt.expected {
 				t.Errorf("formatDate(%q) = %q; want %q", tt.locale, got, tt.expected)
@@ -68,7 +68,7 @@ func TestXTextProvider_DataDriven_TimeFormatting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			provider := newXTextProvider(tt.locale)
+			provider := newXTextProvider(tt.locale, nil)
 			got := provider.formatTime(tt.locale, tt.time)
 			if got != tt.expected {
 				t.Errorf("formatTime(%q) = %q; want %q", tt.locale, got, tt.expected)
@@ -95,7 +95,7 @@ func TestXTextProvider_FormattingRulesLoading(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			provider := newXTextProvider(tt.locale)
+			provider := newXTextProvider(tt.locale, nil)
 			if provider.rules == nil {
 				t.Fatalf("rules is nil for locale %q", tt.locale)
 			}

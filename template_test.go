@@ -213,3 +213,32 @@ func TestTemplateHelpers_BaseLocale_es(t *testing.T) {
 		t.Errorf("format_date(es) = %q; want %q", got, want)
 	}
 }
+
+// Test multi-part locale tags (e.g., zh-Hant-HK → zh-Hant → zh → en)
+func TestTemplateHelpers_MultiPartLocaleFallback(t *testing.T) {
+	helpers := TemplateHelpers(nil, HelperConfig{})
+
+	formatDate, ok := helpers["format_date"].(func(string, time.Time) string)
+	if !ok {
+		t.Fatalf("format_date helper missing: %T", helpers["format_date"])
+	}
+
+	testDate := time.Date(2025, 10, 7, 0, 0, 0, 0, time.UTC)
+
+	// zh-Hant-HK should fall through zh-Hant → zh → en
+	// Since we don't have Chinese providers, it should ultimately use English
+	got := formatDate("zh-Hant-HK", testDate)
+	want := "October 7, 2025" // English fallback
+
+	if got != want {
+		t.Errorf("format_date(zh-Hant-HK) = %q; want %q (should fallback through full chain to English)", got, want)
+	}
+
+	// Verify the same for pt-BR (should fall through pt → en)
+	got2 := formatDate("pt-BR", testDate)
+	want2 := "October 7, 2025" // English fallback
+
+	if got2 != want2 {
+		t.Errorf("format_date(pt-BR) = %q; want %q (should fallback through pt to English)", got2, want2)
+	}
+}
