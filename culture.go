@@ -190,14 +190,14 @@ func (s *cultureService) resolveCandidates(locale string) []string {
 
 	appendLocale(locale)
 
-	for _, parent := range deriveLocaleParents(locale) {
+	for _, parent := range localeParentChain(locale) {
 		appendLocale(parent)
 	}
 
 	if s.resolver != nil {
 		for _, fallback := range s.resolver.Resolve(locale) {
 			appendLocale(fallback)
-			for _, parent := range deriveLocaleParents(fallback) {
+			for _, parent := range localeParentChain(fallback) {
 				appendLocale(parent)
 			}
 		}
