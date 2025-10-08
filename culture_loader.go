@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 )
 
@@ -65,54 +66,51 @@ func (l *CultureDataLoader) AddOverride(locale, path string) {
 
 // mergeCultureDataInto merges source into dest (source takes precedence)
 func mergeCultureDataInto(dest, source *CultureData) {
+	if dest == nil || source == nil {
+		return
+	}
+
 	if source.CurrencyCodes != nil {
 		if dest.CurrencyCodes == nil {
-			dest.CurrencyCodes = make(map[string]string)
+			dest.CurrencyCodes = make(map[string]string, len(source.CurrencyCodes))
 		}
-		for k, v := range source.CurrencyCodes {
-			dest.CurrencyCodes[k] = v
-		}
+		maps.Copy(dest.CurrencyCodes, source.CurrencyCodes)
 	}
 
 	if source.SupportNumbers != nil {
 		if dest.SupportNumbers == nil {
-			dest.SupportNumbers = make(map[string]string)
+			dest.SupportNumbers = make(map[string]string, len(source.SupportNumbers))
 		}
-		for k, v := range source.SupportNumbers {
-			dest.SupportNumbers[k] = v
-		}
+		maps.Copy(dest.SupportNumbers, source.SupportNumbers)
 	}
 
 	if source.Lists != nil {
 		if dest.Lists == nil {
-			dest.Lists = make(map[string]map[string][]string)
+			dest.Lists = make(map[string]map[string][]string, len(source.Lists))
 		}
 		for listName, localeMap := range source.Lists {
+			if localeMap == nil {
+				continue
+			}
 			if dest.Lists[listName] == nil {
-				dest.Lists[listName] = make(map[string][]string)
+				dest.Lists[listName] = make(map[string][]string, len(localeMap))
 			}
-			for loc, list := range localeMap {
-				dest.Lists[listName][loc] = list
-			}
+			maps.Copy(dest.Lists[listName], localeMap)
 		}
 	}
 
 	if source.MeasurementPreferences != nil {
 		if dest.MeasurementPreferences == nil {
-			dest.MeasurementPreferences = make(map[string]MeasurementPrefs)
+			dest.MeasurementPreferences = make(map[string]MeasurementPrefs, len(source.MeasurementPreferences))
 		}
-		for k, v := range source.MeasurementPreferences {
-			dest.MeasurementPreferences[k] = v
-		}
+		maps.Copy(dest.MeasurementPreferences, source.MeasurementPreferences)
 	}
 
 	if source.FormattingRules != nil {
 		if dest.FormattingRules == nil {
-			dest.FormattingRules = make(map[string]FormattingRules)
+			dest.FormattingRules = make(map[string]FormattingRules, len(source.FormattingRules))
 		}
-		for k, v := range source.FormattingRules {
-			dest.FormattingRules[k] = v
-		}
+		maps.Copy(dest.FormattingRules, source.FormattingRules)
 	}
 }
 
