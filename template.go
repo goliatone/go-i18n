@@ -3,6 +3,7 @@ package i18n
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // MissingTranslationHandler decides what string should be emitted when
@@ -45,11 +46,28 @@ func determineDefaultFormatterLocale(t Translator, registry *FormatterRegistry) 
 	return ""
 }
 
-// TemplateHelpers exposes translator + formatter helpers for go-template
+// TemplateHelpers exposes translator + formatter helpers for go-template.
+//
+// For production use, supply a properly configured Registry via HelperConfig.Registry
+// or use Config.TemplateHelpers() which automatically configures fallback resolution
+// for regional locale variants (e.g., es-MX → es → en).
+//
+// When cfg.Registry is nil, this function creates a minimal registry with automatic
+// parent-chain fallback resolution (e.g., zh-Hant-HK → zh-Hant → zh).
 func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 	registry := cfg.Registry
 	if registry == nil {
-		registry = NewFormatterRegistry()
+		// Determine the default locale for ultimate fallback
+		defaultLocale := determineDefaultFormatterLocale(t, nil)
+		if defaultLocale == "" {
+			defaultLocale = "en"
+		}
+
+		// Create a registry with automatic parent-chain fallback
+		// (e.g., zh-Hant-HK → zh-Hant → zh → [default])
+		registry = NewFormatterRegistry(
+			WithFormatterRegistryResolver(newAutoFallbackResolver(defaultLocale)),
+		)
 	}
 
 	helpers := make(map[string]any)
@@ -369,4 +387,41 @@ func wrapFormatter(registry *FormatterRegistry, defaultLocale, name string, base
 	})
 
 	return wrapper.Interface()
+}
+
+// autoFallbackResolver automatically derives the full parent chain
+// from locale tags (e.g., zh-Hant-HK → zh-Hant → zh → [default])
+type autoFallbackResolver struct {
+	defaultLocale string
+}
+
+func newAutoFallbackResolver(defaultLocale string) *autoFallbackResolver {
+	return &autoFallbackResolver{defaultLocale: defaultLocale}
+}
+
+func (r *autoFallbackResolver) Resolve(locale string) []string {
+	if locale == "" {
+		return nil
+	}
+
+	// Build full parent chain by successively stripping components
+	// e.g., zh-Hant-HK → zh-Hant → zh
+	chain := deriveLocaleParents(locale)
+
+	// Add the configured default locale as ultimate fallback
+	// (unless the locale already starts with it)
+	if r.defaultLocale != "" && !strings.HasPrefix(locale, r.defaultLocale) {
+		alreadyHasDefault := false
+		for _, c := range chain {
+			if c == r.defaultLocale || strings.HasPrefix(c, r.defaultLocale) {
+				alreadyHasDefault = true
+				break
+			}
+		}
+		if !alreadyHasDefault {
+			chain = append(chain, r.defaultLocale)
+		}
+	}
+
+	return chain
 }
