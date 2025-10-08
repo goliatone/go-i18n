@@ -484,11 +484,11 @@ func TestFormatterRegistry_SpanishMeasurementFormatting(t *testing.T) {
 //
 // EVIDENCE OF BUG (from debug output):
 // When requesting formatters for "es" locale:
-//   1. candidateLocales("es") returns [es en] (es first, then fallback en)
-//   2. funcMapForLocale loops through candidates in order
-//   3. First copies from "es" provider → result["format_date"] = Spanish formatter
-//   4. Then copies from "en" provider → result["format_date"] = English formatter (OVERWRITES!)
-//   5. Final result has English formatter, not Spanish
+//  1. candidateLocales("es") returns [es en] (es first, then fallback en)
+//  2. funcMapForLocale loops through candidates in order
+//  3. First copies from "es" provider → result["format_date"] = Spanish formatter
+//  4. Then copies from "en" provider → result["format_date"] = English formatter (OVERWRITES!)
+//  5. Final result has English formatter, not Spanish
 //
 // ROOT CAUSE: maps.Copy overwrites existing keys. Since loop iterates [es, en],
 // the en (fallback) provider overwrites the es (specific) provider.
@@ -496,11 +496,11 @@ func TestFormatterRegistry_SpanishMeasurementFormatting(t *testing.T) {
 // EXPECTED: More specific locales should take precedence over fallbacks.
 //
 // DEBUG OUTPUT EXCERPT:
-//   [DEBUG] funcMapForLocale("es") candidates: [es en]
-//   [DEBUG] Copying from typed provider for locale: "es"
-//   [DEBUG] Copying from typed provider for locale: "en"  ← This overwrites "es"
-//   format_date("es", ...) = "October 7, 2025"; want "7 de octubre de 2025"
 //
+//	[DEBUG] funcMapForLocale("es") candidates: [es en]
+//	[DEBUG] Copying from typed provider for locale: "es"
+//	[DEBUG] Copying from typed provider for locale: "en"  ← This overwrites "es"
+//	format_date("es", ...) = "October 7, 2025"; want "7 de octubre de 2025"
 func TestFormatterRegistry_MergeOrder(t *testing.T) {
 	// Create test providers that identify themselves
 	createTestProvider := func(locale string, dateFormat string) TypedFormatterProvider {

@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -228,4 +229,164 @@ func TestEnablePluralizationSeedsParentFallbacks(t *testing.T) {
 	if len(chain) != 1 || chain[0] != "en" {
 		t.Fatalf("expected fallback chain [en], got %#v", chain)
 	}
+}
+
+func TestConfig_CultureService(t *testing.T) {
+	// Create test culture data file
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"currency_codes": {
+			"en": "USD",
+			"es": "EUR"
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithLocales("en", "es"),
+		WithCultureData(cultureFile),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	service := cfg.CultureService()
+	if service == nil {
+		t.Fatal("CultureService() returned nil")
+	}
+
+	// Test currency lookup
+	currency, err := service.GetCurrencyCode("es")
+	if err != nil {
+		t.Errorf("GetCurrencyCode(es): %v", err)
+	}
+	if currency != "EUR" {
+		t.Errorf("GetCurrencyCode(es) = %q; want EUR", currency)
+	}
+}
+
+func TestConfig_CultureServiceWithOverride(t *testing.T) {
+	// Create test culture data file
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+	overrideFile := filepath.Join(tmpDir, "override.json")
+
+	cultureData := `{
+		"currency_codes": {
+			"en": "USD",
+			"es": "EUR"
+		}
+	}`
+
+	overrideData := `{
+		"currency_codes": {
+			"en": "GBP"
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	if err := writeTestFile(overrideFile, []byte(overrideData)); err != nil {
+		t.Fatalf("write override file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithLocales("en", "es"),
+		WithCultureData(cultureFile),
+		WithCultureOverride("en", overrideFile),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	service := cfg.CultureService()
+	if service == nil {
+		t.Fatal("CultureService() returned nil")
+	}
+
+	// Test override was applied
+	currency, err := service.GetCurrencyCode("en")
+	if err != nil {
+		t.Errorf("GetCurrencyCode(en): %v", err)
+	}
+	if currency != "GBP" {
+		t.Errorf("GetCurrencyCode(en) = %q; want GBP (override)", currency)
+	}
+
+	// Test original data still intact
+	currency, err = service.GetCurrencyCode("es")
+	if err != nil {
+		t.Errorf("GetCurrencyCode(es): %v", err)
+	}
+	if currency != "EUR" {
+		t.Errorf("GetCurrencyCode(es) = %q; want EUR", currency)
+	}
+}
+
+func TestConfig_TemplateHelpersWithCulture(t *testing.T) {
+	// Create test culture data file
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"currency_codes": {
+			"en": "USD",
+			"es": "EUR"
+		},
+		"lists": {
+			"trending": {
+				"en": ["coffee", "tea"],
+				"es": ["café", "té"]
+			}
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithLocales("en", "es"),
+		WithCultureData(cultureFile),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	translator, err := cfg.BuildTranslator()
+	if err != nil {
+		t.Fatalf("BuildTranslator: %v", err)
+	}
+
+	helpers := cfg.TemplateHelpers(translator, HelperConfig{
+		LocaleKey: "Locale",
+	})
+
+	// Verify culture helpers are present
+	if _, ok := helpers["resolve_currency"]; !ok {
+		t.Error("resolve_currency helper not found")
+	}
+
+	if _, ok := helpers["culture_value"]; !ok {
+		t.Error("culture_value helper not found")
+	}
+
+	if _, ok := helpers["culture_list"]; !ok {
+		t.Error("culture_list helper not found")
+	}
+
+	if _, ok := helpers["preferred_measurement"]; !ok {
+		t.Error("preferred_measurement helper not found")
+	}
+}
+
+func writeTestFile(path string, data []byte) error {
+	return os.WriteFile(path, data, 0644)
 }

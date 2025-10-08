@@ -1,6 +1,9 @@
 package i18n
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestTemplateHelpersTranslateInferredLocale(t *testing.T) {
 	store := NewStaticStore(Translations{
@@ -147,5 +150,66 @@ func TestTemplateHelpersCustomTranslateKey(t *testing.T) {
 
 	if got := helper("", "foo"); got != "foo" {
 		t.Fatalf("custom translate fallback = %q", got)
+	}
+}
+
+// Regression test: es-MX should inherit Spanish formatting from es locale
+func TestTemplateHelpers_RegionalLocaleFallback_esMX(t *testing.T) {
+	// Use standalone TemplateHelpers without a pre-configured registry
+	helpers := TemplateHelpers(nil, HelperConfig{})
+
+	formatDate, ok := helpers["format_date"].(func(string, time.Time) string)
+	if !ok {
+		t.Fatalf("format_date helper missing: %T", helpers["format_date"])
+	}
+
+	testDate := time.Date(2025, 10, 7, 0, 0, 0, 0, time.UTC)
+
+	// es-MX should inherit Spanish formatting (not English or ISO)
+	got := formatDate("es-MX", testDate)
+	want := "7 de octubre de 2025"
+
+	if got != want {
+		t.Errorf("format_date(es-MX) = %q; want %q (Spanish format, not English)", got, want)
+	}
+}
+
+// Regression test: el (Greek) should fallback to English
+func TestTemplateHelpers_FallbackOnlyLocale_el(t *testing.T) {
+	// Use standalone TemplateHelpers without a pre-configured registry
+	helpers := TemplateHelpers(nil, HelperConfig{})
+
+	formatDate, ok := helpers["format_date"].(func(string, time.Time) string)
+	if !ok {
+		t.Fatalf("format_date helper missing: %T", helpers["format_date"])
+	}
+
+	testDate := time.Date(2025, 10, 7, 0, 0, 0, 0, time.UTC)
+
+	// el should fallback to English formatting
+	got := formatDate("el", testDate)
+	want := "October 7, 2025"
+
+	if got != want {
+		t.Errorf("format_date(el) = %q; want %q (English fallback)", got, want)
+	}
+}
+
+// Test that es base locale still works correctly
+func TestTemplateHelpers_BaseLocale_es(t *testing.T) {
+	helpers := TemplateHelpers(nil, HelperConfig{})
+
+	formatDate, ok := helpers["format_date"].(func(string, time.Time) string)
+	if !ok {
+		t.Fatalf("format_date helper missing: %T", helpers["format_date"])
+	}
+
+	testDate := time.Date(2025, 10, 7, 0, 0, 0, 0, time.UTC)
+
+	got := formatDate("es", testDate)
+	want := "7 de octubre de 2025"
+
+	if got != want {
+		t.Errorf("format_date(es) = %q; want %q", got, want)
 	}
 }
