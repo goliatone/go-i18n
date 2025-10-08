@@ -180,3 +180,19 @@ func TestXTextProvider_FormatNumberNegative(t *testing.T) {
 		})
 	}
 }
+
+func TestXTextProvider_FormatNumberMissingDecimalSeparator(t *testing.T) {
+	provider := newXTextProvider("en", nil)
+	if provider.rules == nil {
+		t.Fatalf("expected rules for locale en")
+	}
+
+	// Simulate incomplete configuration where decimal separator is omitted.
+	provider.rules.CurrencyRules.DecimalSep = ""
+	provider.rules.CurrencyRules.ThousandSep = ","
+
+	const want = "1,234.56"
+	if got := provider.formatNumber("en", 1234.56, 2); got != want {
+		t.Fatalf("formatNumber() = %q; want %q", got, want)
+	}
+}

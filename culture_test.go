@@ -346,3 +346,21 @@ func TestCultureDataLoader_Override(t *testing.T) {
 		t.Errorf("Original data lost: CurrencyCodes[es] = %q; want EUR", code)
 	}
 }
+
+func TestCultureService_FallsBackToParentLocaleWithoutResolver(t *testing.T) {
+	loader := NewCultureDataLoader(filepath.Join("testdata", "culture", "example_culture_data.json"))
+	data, err := loader.Load()
+	if err != nil {
+		t.Fatalf("Load culture data: %v", err)
+	}
+
+	service := NewCultureService(data, nil)
+
+	code, err := service.GetCurrencyCode("en-GB")
+	if err != nil {
+		t.Fatalf("GetCurrencyCode: %v", err)
+	}
+	if code != "USD" {
+		t.Fatalf("GetCurrencyCode(en-GB) = %q; want %q", code, "USD")
+	}
+}
