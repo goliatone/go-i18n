@@ -36,7 +36,8 @@ func CultureHelpers(service CultureService, localeKey string) map[string]any {
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("%.2f %s", converted, unit), nil
+			// Use measurement formatter so locale-specific separators are applied.
+			return FormatMeasurement(locale, converted, unit), nil
 		},
 	}
 }
