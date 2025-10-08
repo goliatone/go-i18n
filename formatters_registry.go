@@ -3,7 +3,6 @@ package i18n
 import (
 	"fmt"
 	"maps"
-	"sort"
 	"sync"
 )
 
@@ -522,28 +521,6 @@ func (r *FormatterRegistry) hasProviderLocked(locale string) bool {
 	}
 
 	return false
-}
-
-func normalizeLocales(locales []string) []string {
-	if len(locales) == 0 {
-		return nil
-	}
-
-	seen := make(map[string]struct{}, len(locales))
-	result := make([]string, 0, len(locales))
-	for _, locale := range locales {
-		if locale == "" {
-			continue
-		}
-		if _, exists := seen[locale]; exists {
-			continue
-		}
-		seen[locale] = struct{}{}
-		result = append(result, locale)
-	}
-
-	sort.Strings(result)
-	return result
 }
 
 func containsLocale(locales []string, target string) bool {
