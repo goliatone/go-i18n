@@ -170,9 +170,38 @@ func (s *cultureService) ConvertMeasurement(locale string, value float64, fromUn
 
 // resolveCandidates returns the list of locale candidates to try
 func (s *cultureService) resolveCandidates(locale string) []string {
-	candidates := []string{locale}
-	if s.resolver != nil {
-		candidates = append(candidates, s.resolver.Resolve(locale)...)
+	if locale == "" {
+		return nil
 	}
+
+	seen := make(map[string]struct{}, 4)
+	candidates := make([]string, 0, 4)
+
+	appendLocale := func(value string) {
+		if value == "" {
+			return
+		}
+		if _, ok := seen[value]; ok {
+			return
+		}
+		seen[value] = struct{}{}
+		candidates = append(candidates, value)
+	}
+
+	appendLocale(locale)
+
+	for _, parent := range deriveLocaleParents(locale) {
+		appendLocale(parent)
+	}
+
+	if s.resolver != nil {
+		for _, fallback := range s.resolver.Resolve(locale) {
+			appendLocale(fallback)
+			for _, parent := range deriveLocaleParents(fallback) {
+				appendLocale(parent)
+			}
+		}
+	}
+
 	return candidates
 }
