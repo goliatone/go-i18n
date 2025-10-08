@@ -112,17 +112,18 @@ func (s *cultureService) GetMeasurementPreference(locale, measurementType string
 	}
 
 	candidates := s.resolveCandidates(locale)
-
-	// Insert "default" after the primary locale but before fallback locales
-	// so that locale-specific defaults take precedence over fallback locale settings
+	searchOrder := make([]string, 0, len(candidates)+1)
 	if len(candidates) > 0 {
-		// Insert default after the first candidate (the requested locale)
-		candidates = append(candidates[:1], append([]string{"default"}, candidates[1:]...)...)
-	} else {
-		candidates = []string{"default"}
+		searchOrder = append(searchOrder, candidates...)
+	}
+	if _, ok := s.data.MeasurementPreferences["default"]; ok {
+		searchOrder = append(searchOrder, "default")
+	}
+	if len(searchOrder) == 0 {
+		searchOrder = append(searchOrder, "default")
 	}
 
-	for _, candidate := range candidates {
+	for _, candidate := range searchOrder {
 		if prefs, ok := s.data.MeasurementPreferences[candidate]; ok {
 			var pref *UnitPreference
 			switch measurementType {
