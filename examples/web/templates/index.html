@@ -17,6 +17,7 @@
             <span class="lang-label">{{t .Locale "language.select"}}</span>
             <a href="?lang=en" class="lang-btn {{if eq .Locale "en"}}active{{end}}">English</a>
             <a href="?lang=es" class="lang-btn {{if eq .Locale "es"}}active{{end}}">Español</a>
+            <a href="?lang=es-MX" class="lang-btn {{if eq .Locale "es-MX"}}active{{end}}">Español (MX)</a>
             <a href="?lang=el" class="lang-btn {{if eq .Locale "el"}}active{{end}}">Ελληνικά</a>
             <a href="?lang=ar" class="lang-btn {{if eq .Locale "ar"}}active{{end}}">العربية</a>
         </nav>
@@ -44,17 +45,21 @@
                     <h3>{{t .Locale "nav.contact"}}</h3>
                     {{$items := translate_count .Locale "items.count" .ItemCount}}
                     <p>{{$items.text}}</p>
-                    <p class="date">{{t .Locale "date.today" .CurrentDate}}</p>
+                    <p class="date">{{t .Locale "date.today" .FormattedDate}}</p>
                 </div>
             </section>
 
             <section class="demo-info">
-                <h3>Demo Information</h3>
+                <h3>{{t .Locale "demo.section.title"}}</h3>
                 <ul>
                     <li><strong>Current Locale:</strong> {{.Locale}}</li>
                     <li><strong>User Name:</strong> {{.UserName}}</li>
-                    <li><strong>Item Count:</strong> {{.ItemCount}}</li>
-                    <li><strong>Date:</strong> {{.CurrentDate}}</li>
+                    <li><strong>{{t .Locale "demo.date"}}:</strong> {{.FormattedDate}}</li>
+                    <li><strong>{{t .Locale "demo.list"}}:</strong> {{format_list .Locale .Trending}}</li>
+                    <li><strong>{{t .Locale "demo.total"}}:</strong> {{format_currency .Locale .CartTotal .Currency}}</li>
+                    <li><strong>{{t .Locale "demo.percent"}}:</strong> {{format_percent .Locale .Completion 1}}</li>
+                    <li><strong>{{t .Locale "demo.measurement"}}:</strong> {{format_measurement .Locale .CartWeight .CartWeightUnit}}</li>
+                    <li><strong>{{t .Locale "demo.phone"}}:</strong> {{format_phone .Locale .SupportLine}}</li>
                 </ul>
             </section>
         </main>
