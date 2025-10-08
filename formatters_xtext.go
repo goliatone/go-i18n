@@ -137,8 +137,11 @@ func (p *xtextProvider) applySeparators(formatted string) string {
 		return formatted
 	}
 
-	// Apply custom separators
+	// Apply custom separators. Default to "." to avoid stripping decimals
 	decimalSep := p.rules.CurrencyRules.DecimalSep
+	if decimalSep == "" {
+		decimalSep = "."
+	}
 	thousandSep := p.rules.CurrencyRules.ThousandSep
 
 	// Replace decimal separator
