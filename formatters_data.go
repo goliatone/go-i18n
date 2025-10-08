@@ -4,57 +4,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-// formattingRulesData contains hardcoded formatting rules for supported locales
-// In the future, this could be generated from CLDR data or loaded from JSON files
-var formattingRulesData = map[string]FormattingRules{
-	"en": {
-		Locale: "en",
-		DatePatterns: DatePatternRules{
-			Pattern:    "{month} {day}, {year}",
-			DayFirst:   false,
-			MonthStyle: "name",
-		},
-		CurrencyRules: CurrencyFormatRules{
-			Pattern:        "{symbol} {amount}",
-			SymbolPosition: "before",
-			DecimalSep:     ".",
-			ThousandSep:    ",",
-			Decimals:       2,
-		},
-		MonthNames: []string{
-			"January", "February", "March", "April", "May", "June",
-			"July", "August", "September", "October", "November", "December",
-		},
-		TimeFormat: TimeFormatRules{
-			Use24Hour: false,
-			Pattern:   "3:04 PM",
-		},
-	},
-	"es": {
-		Locale: "es",
-		DatePatterns: DatePatternRules{
-			Pattern:    "{day} de {month} de {year}",
-			DayFirst:   true,
-			MonthStyle: "name",
-		},
-		CurrencyRules: CurrencyFormatRules{
-			Pattern:        "{amount} {symbol}",
-			SymbolPosition: "after",
-			DecimalSep:     ",",
-			ThousandSep:    ".",
-			Decimals:       2,
-		},
-		MonthNames: []string{
-			"enero", "febrero", "marzo", "abril", "mayo", "junio",
-			"julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-		},
-		TimeFormat: TimeFormatRules{
-			Use24Hour: true,
-			Pattern:   "15:04",
-		},
-	},
-}
-
 // FormattingRulesProvider provides formatting rules for locales
 type FormattingRulesProvider struct {
 	rules    map[string]FormattingRules
