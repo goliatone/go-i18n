@@ -1,5 +1,7 @@
 package i18n
 
+import "sync"
+
 // FallbackResolver resolves fallback locale chains
 type FallbackResolver interface {
 	Resolve(locale string) []string
@@ -10,6 +12,7 @@ var _ FallbackResolver = &StaticFallbackResolver{}
 // StaticFallbackResolver initial imp
 type StaticFallbackResolver struct {
 	chains map[string][]string
+	mu     sync.RWMutex
 }
 
 func NewStaticFallbackResolver() *StaticFallbackResolver {
@@ -21,6 +24,9 @@ func (r *StaticFallbackResolver) Set(locale string, fallbacks ...string) {
 	if r == nil || locale == "" {
 		return
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	if r.chains == nil {
 		r.chains = make(map[string][]string)
@@ -45,12 +51,15 @@ func (r *StaticFallbackResolver) Set(locale string, fallbacks ...string) {
 
 // Resolve returns a copy of the fallback chain for a locale
 func (r *StaticFallbackResolver) Resolve(locale string) []string {
-	if r == nil || r.chains == nil {
+	if r == nil {
 		return nil
 	}
 
-	chain, ok := r.chains[locale]
-	if !ok {
+	r.mu.RLock()
+	chain := r.chains[locale]
+	r.mu.RUnlock()
+
+	if len(chain) == 0 {
 		return nil
 	}
 	out := make([]string, len(chain))
