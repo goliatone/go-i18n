@@ -120,6 +120,69 @@ type FormatterRegistry struct {
 
 var defaultFormatterLocales = []string{"en", "es"}
 
+// formattingRulesData contains hardcoded formatting rules for the locales we ship by default.
+// Keeping this map next to defaultFormatterLocales ensures new locales are added in a single place.
+var formattingRulesData = map[string]FormattingRules{
+	"en": {
+		Locale: "en",
+		DatePatterns: DatePatternRules{
+			Pattern:    "{month} {day}, {year}",
+			DayFirst:   false,
+			MonthStyle: "name",
+		},
+		CurrencyRules: CurrencyFormatRules{
+			Pattern:        "{symbol} {amount}",
+			SymbolPosition: "before",
+			DecimalSep:     ".",
+			ThousandSep:    ",",
+			Decimals:       2,
+		},
+		MonthNames: []string{
+			"January", "February", "March", "April", "May", "June",
+			"July", "August", "September", "October", "November", "December",
+		},
+		TimeFormat: TimeFormatRules{
+			Use24Hour: false,
+			Pattern:   "3:04 PM",
+		},
+	},
+	"es": {
+		Locale: "es",
+		DatePatterns: DatePatternRules{
+			Pattern:    "{day} de {month} de {year}",
+			DayFirst:   true,
+			MonthStyle: "name",
+		},
+		CurrencyRules: CurrencyFormatRules{
+			Pattern:        "{amount} {symbol}",
+			SymbolPosition: "after",
+			DecimalSep:     ",",
+			ThousandSep:    ".",
+			Decimals:       2,
+		},
+		MonthNames: []string{
+			"enero", "febrero", "marzo", "abril", "mayo", "junio",
+			"julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+		},
+		TimeFormat: TimeFormatRules{
+			Use24Hour: true,
+			Pattern:   "15:04",
+		},
+	},
+}
+
+var defaultPhoneDialPlans = map[string]PhoneDialPlan{
+	"en": {
+		CountryCode:    "1",
+		NationalPrefix: "1",
+		Groups:         []int{3, 3, 4},
+	},
+	"es": {
+		CountryCode: "34",
+		Groups:      []int{3, 3, 3},
+	},
+}
+
 type formatterRegistryConfig struct {
 	resolver      FallbackResolver
 	locales       []string
