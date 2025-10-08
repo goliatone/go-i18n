@@ -170,6 +170,26 @@ registry.Register("format_currency", func(locale string, value float64, currency
 })
 ```
 
+### Phone Dial Plans & Libphonenumber Adapter
+
+- The registry ships curated dial plans for high-traffic locales (`en`, `es`) so `format_phone` formats inputs into `+<country> <groups>` without extra setup.
+- Register additional metadata-driven plans with `i18n.RegisterPhoneDialPlan(locale, i18n.PhoneDialPlan{ ... })`, or provide a fully custom formatter via `i18n.RegisterPhoneFormatter`.
+- Query built-in coverage using `i18n.DefaultPhoneDialPlan(locale)` when you need to introspect the bundled configuration.
+
+Optional libphonenumber integration lives in `modules/libphonenumber` with its own `go.mod`. Consumers opt-in explicitly:
+
+```go
+import libphone "github.com/goliatone/go-i18n/modules/libphonenumber"
+
+func init() {
+    libphone.RegisterMany([]string{"en-US", "es", "fr"})
+    // Or specialise behaviour:
+    libphone.Register("mx", libphone.WithRegion("MX"))
+}
+```
+
+The adapter pulls `github.com/nyaruka/phonenumbers`, offering Google’s phone parsing and formatting while keeping the core module lean.
+
 ## Translation Hooks
 
 Hooks allow interception of translation calls for logging, metrics, or debugging:
