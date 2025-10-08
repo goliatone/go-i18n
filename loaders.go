@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 var placeholderPattern = regexp.MustCompile(`\{([a-zA-Z0-9_]+)\}`)
@@ -151,106 +153,60 @@ func buildMessageFromJSON(locale, key string, raw json.RawMessage, source string
 }
 
 func decodeTranslationsYAML(path, input string) (map[string]map[string]Message, error) {
-	catalogs := make(map[string]map[string]Message)
-
-	var currentLocale string
-	var currentKey string
-	var currentVariants map[PluralCategory]string
-
-	flushVariants := func() error {
-		if currentKey == "" {
-			return nil
-		}
-		if currentLocale == "" {
-			return fmt.Errorf("variant block defined before locale in %s", path)
-		}
-		message, err := buildMessageFromVariants(currentLocale, currentKey, currentVariants, path)
-		if err != nil {
-			return err
-		}
-		catalog := catalogs[currentLocale]
-		if catalog == nil {
-			catalog = make(map[string]Message)
-			catalogs[currentLocale] = catalog
-		}
-		catalog[currentKey] = message
-		currentKey = ""
-		currentVariants = nil
-		return nil
+	var raw map[string]map[string]interface{}
+	if err := yaml.Unmarshal([]byte(input), &raw); err != nil {
+		return nil, fmt.Errorf("yaml parse error: %w", err)
 	}
 
-	lines := strings.Split(input, "\n")
-	for idx, raw := range lines {
-		line := strings.TrimSpace(raw)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		indent, ok := leadingSpaces(raw)
-		if !ok {
-			return nil, fmt.Errorf("line %d: tabs are not allowed for indentation", idx+1)
-		}
-		switch indent {
-		case 0:
-			if err := flushVariants(); err != nil {
-				return nil, fmt.Errorf("line %d: %w", idx+1, err)
-			}
-			if !strings.HasSuffix(line, ":") {
-				return nil, fmt.Errorf("invalid locale declaration on line %d", idx+1)
-			}
-			locale := strings.TrimSuffix(line, ":")
-			if locale == "" {
-				return nil, fmt.Errorf("empty locale on line %d", idx+1)
-			}
-			currentLocale = locale
-			if catalogs[currentLocale] == nil {
-				catalogs[currentLocale] = make(map[string]Message)
-			}
-		case 2:
-			if err := flushVariants(); err != nil {
-				return nil, fmt.Errorf("line %d: %w", idx+1, err)
-			}
-			key, value, hasValue := splitKeyValue(line)
-			if key == "" {
-				return nil, fmt.Errorf("empty key on line %d", idx+1)
-			}
-			if !hasValue {
-				currentKey = key
-				currentVariants = make(map[PluralCategory]string)
-				continue
-			}
-			message, err := buildMessageFromVariants(currentLocale, key, map[PluralCategory]string{PluralOther: value}, path)
-			if err != nil {
-				return nil, fmt.Errorf("line %d: %w", idx+1, err)
-			}
-			catalogs[currentLocale][key] = message
-		case 4:
-			if currentKey == "" {
-				return nil, fmt.Errorf("variant value without key on line %d", idx+1)
-			}
-			catKey, value, hasValue := splitKeyValue(line)
-			if !hasValue {
-				return nil, fmt.Errorf("invalid variant on line %d", idx+1)
-			}
-			category, err := parsePluralCategory(catKey)
-			if err != nil {
-				return nil, fmt.Errorf("line %d: %w", idx+1, err)
-			}
-			currentVariants[category] = value
-		default:
-			return nil, fmt.Errorf("unsupported indentation on line %d", idx+1)
-		}
-	}
-
-	if err := flushVariants(); err != nil {
-		return nil, err
-	}
-
-	if len(catalogs) == 0 {
+	if len(raw) == 0 {
 		return nil, errors.New("empty translations yaml")
 	}
 
+	catalogs := make(map[string]map[string]Message, len(raw))
+	for locale, messages := range raw {
+		if locale == "" {
+			return nil, fmt.Errorf("empty locale in %s", path)
+		}
+
+		catalog := make(map[string]Message, len(messages))
+		for key, value := range messages {
+			if key == "" {
+				return nil, fmt.Errorf("empty key in %s/%s", locale, path)
+			}
+
+			message, err := buildMessageFromYAMLValue(locale, key, value, path)
+			if err != nil {
+				return nil, fmt.Errorf("%s/%s: %w", locale, key, err)
+			}
+			catalog[key] = message
+		}
+		catalogs[locale] = catalog
+	}
+
 	return catalogs, nil
+}
+
+func buildMessageFromYAMLValue(locale, key string, value interface{}, source string) (Message, error) {
+	switch v := value.(type) {
+	case string:
+		return buildMessageFromVariants(locale, key, map[PluralCategory]string{PluralOther: v}, source)
+	case map[string]interface{}:
+		variants := make(map[PluralCategory]string, len(v))
+		for category, template := range v {
+			cat, err := parsePluralCategory(category)
+			if err != nil {
+				return Message{}, err
+			}
+			templateStr, ok := template.(string)
+			if !ok {
+				return Message{}, fmt.Errorf("plural variant %s must be a string, got %T", category, template)
+			}
+			variants[cat] = templateStr
+		}
+		return buildMessageFromVariants(locale, key, variants, source)
+	default:
+		return Message{}, fmt.Errorf("unsupported message value type: %T", value)
+	}
 }
 
 func buildMessageFromVariants(locale, key string, variants map[PluralCategory]string, source string) (Message, error) {
@@ -584,43 +540,7 @@ func inferDomain(key string) string {
 	return "default"
 }
 
-func splitKeyValue(line string) (string, string, bool) {
-	parts := strings.SplitN(line, ":", 2)
-	if len(parts) != 2 {
-		return strings.TrimSpace(parts[0]), "", false
-	}
-	key := strings.TrimSpace(parts[0])
-	value := strings.TrimSpace(parts[1])
-	value = strings.TrimPrefix(value, "|")
-	value = strings.TrimSpace(value)
-	if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") && len(value) >= 2 {
-		value = value[1 : len(value)-1]
-	}
-	if strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'") && len(value) >= 2 {
-		value = value[1 : len(value)-1]
-	}
-	if value == "" {
-		return key, value, false
-	}
-	return key, value, true
-}
-
 func checksum(input string) string {
 	sum := sha1.Sum([]byte(input))
 	return hex.EncodeToString(sum[:])
-}
-
-func leadingSpaces(input string) (int, bool) {
-	count := 0
-	for _, ch := range input {
-		if ch == ' ' {
-			count++
-			continue
-		}
-		if ch == '\t' {
-			return 0, false
-		}
-		break
-	}
-	return count, true
 }
