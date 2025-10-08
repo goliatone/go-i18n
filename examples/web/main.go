@@ -19,23 +19,14 @@ var (
 )
 
 type PageData struct {
-	Locale             string
-	Title              string
-	UserName           string
-	ItemCount          int
-	OrderDate          time.Time
-	FormattedDate      string
-	CartTotal          float64
-	Currency           string
-	Trending           []string
-	FormattedTrending  string
-	Completion         float64
-	CartWeight         float64
-	CartWeightUnit     string
-	FormattedCartTotal string
-	FormattedPercent   string
-	FormattedWeight    string
-	SupportLine        string
+	Locale      string
+	Title       string
+	UserName    string
+	ItemCount   int
+	OrderDate   time.Time
+	CartTotal   float64
+	Completion  float64
+	CartWeight  float64
 }
 
 func main() {
@@ -68,6 +59,7 @@ func setup() error {
 		i18n.WithFallback("el", "en"),
 		i18n.WithFallback("ar", "en"),
 		i18n.WithFormatterLocales("en", "es", "es-MX", "el", "ar"),
+		i18n.WithCultureData(filepath.Join("locales", "culture_data.json")),
 	)
 	if err != nil {
 		return err
@@ -83,6 +75,7 @@ func setup() error {
 	helperFuncs = cfg.TemplateHelpers(translator, i18n.HelperConfig{
 		TemplateHelperKey: "t",
 		Registry:          registry,
+		LocaleKey:         "Locale",
 		OnMissing: func(locale, key string, args []any, err error) string {
 			return fmt.Sprintf("[missing:%s]", key)
 		},
@@ -109,75 +102,19 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	title, _ := translator.Translate(locale, "site.title")
 
-	currency := map[string]string{
-		"en":    "USD",
-		"es":    "EUR",
-		"es-MX": "MXN",
-		"el":    "EUR",
-		"ar":    "AED",
-	}[locale]
-	if currency == "" {
-		currency = "USD"
-	}
-
-	trendingByLocale := map[string][]string{
-		"en":    {"coffee", "tea", "cake"},
-		"es":    {"café", "té", "pastel"},
-		"es-MX": {"café", "pan dulce", "chocolate"},
-		"el":    {"καφές", "τσάι", "κέικ"},
-		"ar":    {"قهوة", "شاي", "كعكة"},
-	}
-	trending := trendingByLocale[locale]
-	if len(trending) == 0 {
-		trending = trendingByLocale["en"]
-	}
-
-	supportLines := map[string]string{
-		"en":    "+1 555 010 4242",
-		"es":    "+34 900 123 456",
-		"es-MX": "+52 55 1234 5678",
-		"el":    "+30 210 123 4567",
-		"ar":    "+971 4 123 4567",
-	}
-	support := supportLines[locale]
-	if support == "" {
-		support = supportLines["en"]
-	}
-
 	orderDate := time.Now()
-
 	cartTotal := 129.95
 	cartWeight := 2.75
-	cartWeightUnit := "kg"
-	if locale == "en" {
-		cartWeight = cartWeight * 2.20462
-		cartWeightUnit = "lb"
-	}
-
-	formatDate := helperFuncs["format_date"].(func(string, time.Time) string)
-	formatCurrency := helperFuncs["format_currency"].(func(string, float64, string) string)
-	formatList := helperFuncs["format_list"].(func(string, []string) string)
-	formatPercent := helperFuncs["format_percent"].(func(string, float64, int) string)
-	formatMeasurement := helperFuncs["format_measurement"].(func(string, float64, string) string)
 
 	data := PageData{
-		Locale:             locale,
-		Title:              title,
-		UserName:           "Guest",
-		ItemCount:          3,
-		OrderDate:          orderDate,
-		FormattedDate:      formatDate(locale, orderDate),
-		CartTotal:          cartTotal,
-		Currency:           currency,
-		Trending:           trending,
-		FormattedTrending:  formatList(locale, trending),
-		Completion:         0.42,
-		CartWeight:         cartWeight,
-		CartWeightUnit:     cartWeightUnit,
-		FormattedCartTotal: formatCurrency(locale, cartTotal, currency),
-		FormattedPercent:   formatPercent(locale, 0.42, 2),
-		FormattedWeight:    formatMeasurement(locale, cartWeight, cartWeightUnit),
-		SupportLine:        support,
+		Locale:      locale,
+		Title:       title,
+		UserName:    "Guest",
+		ItemCount:   3,
+		OrderDate:   orderDate,
+		CartTotal:   cartTotal,
+		Completion:  0.42,
+		CartWeight:  cartWeight,
 	}
 
 	log.Printf("render locale=%s", locale)

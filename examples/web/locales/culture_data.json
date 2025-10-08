@@ -32,5 +32,53 @@
         "conversion_from": {"kg": 2.20462}
       }
     }
+  },
+  "formatting_rules": {
+    "el": {
+      "locale": "el",
+      "date_patterns": {
+        "pattern": "{day}/{month}/{year}",
+        "day_first": true,
+        "month_style": "number"
+      },
+      "currency_rules": {
+        "pattern": "{amount} {symbol}",
+        "symbol_position": "after",
+        "decimal_separator": ",",
+        "thousand_separator": ".",
+        "decimals": 2
+      },
+      "month_names": [
+        "Ιανουαρίου", "Φεβρουαρίου", "Μαρτίου", "Απριλίου", "Μαΐου", "Ιουνίου",
+        "Ιουλίου", "Αυγούστου", "Σεπτεμβρίου", "Οκτωβρίου", "Νοεμβρίου", "Δεκεμβρίου"
+      ],
+      "time_format": {
+        "use_24_hour": true,
+        "pattern": "15:04"
+      }
+    },
+    "ar": {
+      "locale": "ar",
+      "date_patterns": {
+        "pattern": "{day}/{month}/{year}",
+        "day_first": true,
+        "month_style": "number"
+      },
+      "currency_rules": {
+        "pattern": "{amount} {symbol}",
+        "symbol_position": "after",
+        "decimal_separator": ".",
+        "thousand_separator": ",",
+        "decimals": 2
+      },
+      "month_names": [
+        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+      ],
+      "time_format": {
+        "use_24_hour": false,
+        "pattern": "3:04 PM"
+      }
+    }
   }
 }
