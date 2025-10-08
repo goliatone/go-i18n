@@ -51,9 +51,9 @@ var cldrBundles = map[string]cldrBundle{
 			},
 		},
 		Phone: cldrPhoneMetadata{
-			CountryCode:    "",
-			NationalPrefix: "",
-			Groups:         []int{},
+			CountryCode:    "1",
+			NationalPrefix: "1",
+			Groups:         []int{3, 3, 4},
 		},
 	},
 	"es": {
@@ -76,9 +76,9 @@ var cldrBundles = map[string]cldrBundle{
 			},
 		},
 		Phone: cldrPhoneMetadata{
-			CountryCode:    "",
+			CountryCode:    "34",
 			NationalPrefix: "",
-			Groups:         []int{},
+			Groups:         []int{3, 3, 3},
 		},
 	},
 }
