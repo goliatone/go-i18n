@@ -178,10 +178,10 @@ func prepareTranslateCall(params ...any) helperCall {
 	call := helperCall{}
 
 	for _, param := range params {
-		if count, ok := extractCountOption(param); ok {
+		if count, options, ok := extractCountOption(param); ok {
 			call.hasCount = true
 			call.count = count
-			if residual := removeKnownOptions(param, "count"); residual != nil {
+			if residual := removeKnownOptions(options, "count"); residual != nil {
 				call.args = append(call.args, residual)
 			}
 			continue
@@ -212,45 +212,40 @@ func executeTemplateTranslation(t Translator, locale, key string, call helperCal
 	return result, nil, err
 }
 
-func extractCountOption(param any) (any, bool) {
-	clone, ok := toStringMap(param)
+func extractCountOption(param any) (any, map[string]any, bool) {
+	options, ok := toStringMap(param)
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 
-	value, exists := clone["count"]
+	value, exists := options["count"]
 	if !exists {
-		return nil, false
+		return nil, nil, false
 	}
 
-	return value, true
+	return value, options, true
 }
 
-func removeKnownOptions(param any, keys ...string) any {
-	clone, ok := toStringMap(param)
-	if !ok {
-		return param
-	}
-
-	for _, key := range keys {
-		delete(clone, key)
-	}
-
-	if len(clone) == 0 {
+func removeKnownOptions(options map[string]any, keys ...string) any {
+	if len(options) == 0 {
 		return nil
 	}
 
-	return clone
+	for _, key := range keys {
+		delete(options, key)
+	}
+
+	if len(options) == 0 {
+		return nil
+	}
+
+	return options
 }
 
 func toStringMap(param any) (map[string]any, bool) {
 	switch value := param.(type) {
 	case map[string]any:
-		clone := make(map[string]any, len(value))
-		for k, v := range value {
-			clone[k] = v
-		}
-		return clone, true
+		return cloneStringKeyMap(value), true
 	case map[any]any:
 		clone := make(map[string]any, len(value))
 		for k, v := range value {
@@ -264,6 +259,17 @@ func toStringMap(param any) (map[string]any, bool) {
 	default:
 		return nil, false
 	}
+}
+
+func cloneStringKeyMap(input map[string]any) map[string]any {
+	if len(input) == 0 {
+		return map[string]any{}
+	}
+	clone := make(map[string]any, len(input))
+	for k, v := range input {
+		clone[k] = v
+	}
+	return clone
 }
 
 func stringifyMapKey(key any) (string, bool) {
