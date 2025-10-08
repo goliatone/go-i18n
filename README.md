@@ -188,6 +188,107 @@ cfg, err := i18n.NewConfig(
 )
 ```
 
+## Culture Data & Formatting Rules
+
+Applications can provide locale-specific business data and formatting rules through a single JSON file. The library includes embedded defaults for common locales (en, es, el) and automatically merges application-provided data.
+
+### Culture Data File Format
+
+```json
+{
+  "currency_codes": {
+    "en": "USD",
+    "es": "EUR",
+    "ar": "AED"
+  },
+  "support_numbers": {
+    "en": "+1 555 010 4242",
+    "es": "+34 900 123 456"
+  },
+  "lists": {
+    "trending_products": {
+      "en": ["coffee", "tea", "cake"],
+      "es": ["café", "té", "pastel"]
+    }
+  },
+  "measurement_preferences": {
+    "default": {
+      "weight": {"unit": "kg"}
+    },
+    "en": {
+      "weight": {
+        "unit": "lb",
+        "conversion_from": {"kg": 2.20462}
+      }
+    }
+  },
+  "formatting_rules": {
+    "ar": {
+      "locale": "ar",
+      "date_patterns": {
+        "pattern": "{day}/{month}/{year}",
+        "day_first": true,
+        "month_style": "number"
+      },
+      "currency_rules": {
+        "pattern": "{amount} {symbol}",
+        "symbol_position": "after",
+        "decimal_separator": ".",
+        "thousand_separator": ",",
+        "decimals": 2
+      },
+      "month_names": [
+        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+      ],
+      "time_format": {
+        "use_24_hour": false,
+        "pattern": "3:04 PM"
+      }
+    }
+  }
+}
+```
+
+### Using Culture Data
+
+```go
+cfg, err := i18n.NewConfig(
+    i18n.WithLocales("en", "es", "ar"),
+    i18n.WithCultureData("locales/culture_data.json"),
+)
+
+// Access culture service
+cultureService := cfg.CultureService()
+currencyCode, _ := cultureService.GetCurrencyCode("ar")
+supportNumber, _ := cultureService.GetSupportNumber("es")
+products, _ := cultureService.GetList("en", "trending_products")
+
+// Access in templates
+helpers := cfg.TemplateHelpers(translator, i18n.HelperConfig{
+    LocaleKey: "Locale",
+})
+// Available helpers: currency_code, support_number, list, measurement_pref
+```
+
+### Culture Data Features
+
+- **Embedded Defaults**: Library includes formatting rules for en, es, el
+- **Application Override**: Provide custom rules that merge with or override defaults
+- **Locale Fallback**: Uses same fallback chain as translations (e.g., ar-SA → ar → en)
+- **Per-Locale Overrides**: Use `WithCultureOverride(locale, path)` for locale-specific files
+
+### Formatting Rules
+
+The `formatting_rules` section allows applications to customize how dates, times, currencies, and numbers are formatted for each locale:
+
+- **date_patterns**: Date format patterns with placeholders `{day}`, `{month}`, `{year}`
+- **currency_rules**: Currency symbol placement and separators
+- **month_names**: Localized month names
+- **time_format**: 12/24-hour clock preference
+
+Custom formatting rules automatically integrate with the formatter registry and are used by `format_date`, `format_time`, `format_currency` template helpers.
+
 ## Configuration Options
 
 - `WithDefaultLocale(locale)` - Set default locale
@@ -200,6 +301,8 @@ cfg, err := i18n.NewConfig(
 - `WithFormatterLocales(...locales)` - Configure formatter provider coverage and fallback scaffolding
 - `WithFormatterProvider(locale, provider)` - Inject custom formatter providers per locale
 - `WithTranslatorHooks(...hooks)` - Add translation hooks
+- `WithCultureData(path)` - Load culture data and formatting rules from JSON file
+- `WithCultureOverride(locale, path)` - Add locale-specific culture data override
 
 ## Error Handling
 
