@@ -22,7 +22,14 @@ func RegisterCLDRFormatters(registry *FormatterRegistry, locales ...string) {
 		}
 
 		if bundle, ok := cldrBundles[trimmed]; ok {
-			registry.RegisterTypedProvider(trimmed, newCLDRProvider(trimmed, bundle))
+			localBundle := bundle
+			if plan, exists := DefaultPhoneDialPlan(trimmed); exists {
+				meta := plan.toMetadata()
+				if meta.CountryCode != "" && len(meta.Groups) > 0 {
+					localBundle.Phone = meta
+				}
+			}
+			registry.RegisterTypedProvider(trimmed, newCLDRProvider(trimmed, localBundle))
 		}
 	}
 }
@@ -133,63 +140,7 @@ func (p *cldrProvider) formatMeasurement(_ string, value float64, unit string) s
 }
 
 func (p *cldrProvider) formatPhone(_ string, raw string) string {
-	meta := p.bundle.Phone
-	if meta.CountryCode == "" || len(meta.Groups) == 0 {
-		return strings.TrimSpace(raw)
-	}
-
-	trimmed := strings.TrimSpace(raw)
-	digits := extractDigits(trimmed)
-	if len(digits) == 0 {
-		return trimmed
-	}
-
-	total := 0
-	for _, g := range meta.Groups {
-		total += g
-	}
-
-	var national string
-	switch {
-	case strings.HasPrefix(digits, meta.CountryCode) && len(digits) >= len(meta.CountryCode)+total:
-		national = digits[len(meta.CountryCode):]
-	case len(digits) == total:
-		national = digits
-	default:
-		return trimmed
-	}
-
-	if len(national) < total {
-		return trimmed
-	}
-
-	var builder strings.Builder
-	builder.WriteString("+")
-	builder.WriteString(meta.CountryCode)
-	builder.WriteString(" ")
-
-	pos := 0
-	for i, group := range meta.Groups {
-		if group <= 0 || pos >= len(national) {
-			break
-		}
-		upper := pos + group
-		if upper > len(national) {
-			upper = len(national)
-		}
-		if i > 0 {
-			builder.WriteString(" ")
-		}
-		builder.WriteString(national[pos:upper])
-		pos = upper
-	}
-
-	if pos < len(national) {
-		builder.WriteString(" ")
-		builder.WriteString(national[pos:])
-	}
-
-	return builder.String()
+	return formatPhoneWithMetadata(raw, p.bundle.Phone)
 }
 
 func applyListPattern(pattern, head, tail string) string {
@@ -208,5 +159,74 @@ func extractDigits(input string) string {
 			builder.WriteRune(r)
 		}
 	}
+	return builder.String()
+}
+
+func formatPhoneWithMetadata(raw string, meta cldrPhoneMetadata) string {
+	trimmed := strings.TrimSpace(raw)
+	if meta.CountryCode == "" || len(meta.Groups) == 0 {
+		return trimmed
+	}
+
+	digits := extractDigits(trimmed)
+	if len(digits) == 0 {
+		return trimmed
+	}
+
+	groupTotal := 0
+	for _, size := range meta.Groups {
+		if size > 0 {
+			groupTotal += size
+		}
+	}
+	if groupTotal == 0 {
+		return trimmed
+	}
+
+	var national string
+	switch {
+	case strings.HasPrefix(digits, meta.CountryCode) && len(digits) >= len(meta.CountryCode)+groupTotal:
+		national = digits[len(meta.CountryCode):]
+	case meta.NationalPrefix != "" && strings.HasPrefix(digits, meta.NationalPrefix) && len(digits) >= len(meta.NationalPrefix)+groupTotal:
+		national = digits[len(meta.NationalPrefix):]
+	case len(digits) == groupTotal:
+		national = digits
+	default:
+		return trimmed
+	}
+
+	if len(national) < groupTotal {
+		return trimmed
+	}
+
+	var builder strings.Builder
+	builder.Grow(len(meta.CountryCode) + len(national) + len(meta.Groups) + 2)
+	builder.WriteString("+")
+	builder.WriteString(meta.CountryCode)
+	builder.WriteString(" ")
+
+	pos := 0
+	for i, group := range meta.Groups {
+		if group <= 0 || pos >= len(national) {
+			break
+		}
+
+		upper := pos + group
+		if upper > len(national) {
+			upper = len(national)
+		}
+
+		if i > 0 {
+			builder.WriteString(" ")
+		}
+		builder.WriteString(national[pos:upper])
+		pos = upper
+	}
+
+	if pos < len(national) {
+		builder.WriteString(" ")
+		builder.WriteString(national[pos:])
+	}
+
 	return builder.String()
 }
