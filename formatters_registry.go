@@ -106,25 +106,27 @@ type TypedFormatterProvider interface {
 
 // FormatRegistry manages formatter functions and locale specific overrides
 type FormatterRegistry struct {
-	mu        sync.RWMutex
-	defaults  map[string]any
-	overrides map[string]map[string]any
-	providers map[string]FormatterProvider
-	globals   map[string]any
-	funcCache map[string]map[string]any
-	resolver  FallbackResolver
-	locales   []string
-	typed     map[string]TypedFormatterProvider
-	caps      map[string]FormatterCapabilities
+	mu            sync.RWMutex
+	defaults      map[string]any
+	overrides     map[string]map[string]any
+	providers     map[string]FormatterProvider
+	globals       map[string]any
+	funcCache     map[string]map[string]any
+	resolver      FallbackResolver
+	locales       []string
+	typed         map[string]TypedFormatterProvider
+	caps          map[string]FormatterCapabilities
+	rulesProvider *FormattingRulesProvider
 }
 
 var defaultFormatterLocales = []string{"en", "es"}
 
 type formatterRegistryConfig struct {
-	resolver  FallbackResolver
-	locales   []string
-	providers map[string]FormatterProvider
-	typed     map[string]TypedFormatterProvider
+	resolver      FallbackResolver
+	locales       []string
+	providers     map[string]FormatterProvider
+	typed         map[string]TypedFormatterProvider
+	rulesProvider *FormattingRulesProvider
 }
 
 type FormatterRegistryOption func(*formatterRegistryConfig)
@@ -165,6 +167,12 @@ func WithFormatterRegistryProvider(locale string, provider FormatterProvider) Fo
 	}
 }
 
+func WithFormattingRulesProvider(provider *FormattingRulesProvider) FormatterRegistryOption {
+	return func(frc *formatterRegistryConfig) {
+		frc.rulesProvider = provider
+	}
+}
+
 // NewFormatterRegistry seeds a registry with default formatter implementations
 func NewFormatterRegistry(opts ...FormatterRegistryOption) *FormatterRegistry {
 
@@ -192,11 +200,12 @@ func NewFormatterRegistry(opts ...FormatterRegistryOption) *FormatterRegistry {
 	}
 
 	registry := &FormatterRegistry{
-		defaults:  defaults,
-		overrides: make(map[string]map[string]any),
-		providers: make(map[string]FormatterProvider),
-		resolver:  cfg.resolver,
-		locales:   cfg.locales,
+		defaults:      defaults,
+		overrides:     make(map[string]map[string]any),
+		providers:     make(map[string]FormatterProvider),
+		resolver:      cfg.resolver,
+		locales:       cfg.locales,
+		rulesProvider: cfg.rulesProvider,
 	}
 
 	registry.registerDefaults()
@@ -209,7 +218,7 @@ func NewFormatterRegistry(opts ...FormatterRegistryOption) *FormatterRegistry {
 }
 
 func (r *FormatterRegistry) registerDefaults() {
-	RegisterXTextFormatters(r, defaultFormatterLocales...)
+	RegisterXTextFormatters(r, r.rulesProvider, defaultFormatterLocales...)
 	RegisterCLDRFormatters(r, defaultFormatterLocales...)
 }
 
@@ -387,7 +396,13 @@ func (r *FormatterRegistry) funcMapForLocale(locale string) map[string]any {
 	}
 
 	if effective != "" {
-		for _, candidate := range r.candidateLocales(effective) {
+		candidates := r.candidateLocales(effective)
+
+		// REVERSE ITERATION: Start from least-specific (fallback) to most-specific (target)
+		// This ensures more specific locales overwrite fallback locales
+		for i := len(candidates) - 1; i >= 0; i-- {
+			candidate := candidates[i]
+
 			if r.typed != nil {
 				if provider := r.typed[candidate]; provider != nil {
 					maps.Copy(result, provider.FuncMap())
