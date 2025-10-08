@@ -36,7 +36,7 @@
         "datetime": "9 de julio de 2023 15:04",
         "time": "15:04",
         "number": "12.345,68",
-        "currency": "€ 12.345,68",
+        "currency": "12.345,68 €",
         "percent": "12.3%",
         "list": "alpha, beta y gamma",
         "ordinal": "21º",

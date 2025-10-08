@@ -1,0 +1,73 @@
+{
+  "formatting_rules": {
+    "en": {
+      "locale": "en",
+      "date_patterns": {
+        "pattern": "{month} {day}, {year}",
+        "day_first": false,
+        "month_style": "name"
+      },
+      "currency_rules": {
+        "pattern": "{symbol} {amount}",
+        "symbol_position": "before",
+        "decimal_separator": ".",
+        "thousand_separator": ",",
+        "decimals": 2
+      },
+      "month_names": [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ],
+      "time_format": {
+        "use_24_hour": false,
+        "pattern": "3:04 PM"
+      }
+    },
+    "es": {
+      "locale": "es",
+      "date_patterns": {
+        "pattern": "{day} de {month} de {year}",
+        "day_first": true,
+        "month_style": "name"
+      },
+      "currency_rules": {
+        "pattern": "{amount} {symbol}",
+        "symbol_position": "after",
+        "decimal_separator": ",",
+        "thousand_separator": ".",
+        "decimals": 2
+      },
+      "month_names": [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+      ],
+      "time_format": {
+        "use_24_hour": true,
+        "pattern": "15:04"
+      }
+    },
+    "el": {
+      "locale": "el",
+      "date_patterns": {
+        "pattern": "{day}/{month}/{year}",
+        "day_first": true,
+        "month_style": "number"
+      },
+      "currency_rules": {
+        "pattern": "{amount} {symbol}",
+        "symbol_position": "after",
+        "decimal_separator": ",",
+        "thousand_separator": ".",
+        "decimals": 2
+      },
+      "month_names": [
+        "Ιανουαρίου", "Φεβρουαρίου", "Μαρτίου", "Απριλίου", "Μαΐου", "Ιουνίου",
+        "Ιουλίου", "Αυγούστου", "Σεπτεμβρίου", "Οκτωβρίου", "Νοεμβρίου", "Δεκεμβρίου"
+      ],
+      "time_format": {
+        "use_24_hour": true,
+        "pattern": "15:04"
+      }
+    }
+  }
+}
