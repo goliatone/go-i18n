@@ -1,7 +1,6 @@
 package i18n
 
 import (
-	"sort"
 	"strings"
 )
 
@@ -234,25 +233,7 @@ func (cfg *Config) BuildTranslator() (Translator, error) {
 }
 
 func (cfg *Config) normalizeLocales() {
-	if len(cfg.Locales) == 0 {
-		return
-	}
-
-	seen := make(map[string]struct{}, len(cfg.Locales))
-	dedeped := cfg.Locales[:0]
-	for _, locale := range cfg.Locales {
-		if locale == "" {
-			continue
-		}
-
-		if _, ok := seen[locale]; ok {
-			continue
-		}
-		seen[locale] = struct{}{}
-		dedeped = append(dedeped, locale)
-	}
-	sort.Strings(dedeped)
-	cfg.Locales = dedeped
+	cfg.Locales = normalizeLocales(cfg.Locales)
 }
 
 func (cfg *Config) FormatterRegistry() *FormatterRegistry {
