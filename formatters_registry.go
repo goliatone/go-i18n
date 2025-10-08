@@ -208,7 +208,7 @@ func NewFormatterRegistry(opts ...FormatterRegistryOption) *FormatterRegistry {
 		rulesProvider: cfg.rulesProvider,
 	}
 
-	registry.registerDefaults()
+	registry.registerDefaults(cfg.locales)
 	registry.registerTypedProviders(cfg.typed)
 	registry.registerConfiguredProviders(cfg.providers)
 	registry.seedFallbacks()
@@ -217,9 +217,14 @@ func NewFormatterRegistry(opts ...FormatterRegistryOption) *FormatterRegistry {
 	return registry
 }
 
-func (r *FormatterRegistry) registerDefaults() {
-	RegisterXTextFormatters(r, r.rulesProvider, defaultFormatterLocales...)
-	RegisterCLDRFormatters(r, defaultFormatterLocales...)
+func (r *FormatterRegistry) registerDefaults(locales []string) {
+	// Use configured locales if provided, otherwise use defaults
+	localesToRegister := locales
+	if len(localesToRegister) == 0 {
+		localesToRegister = defaultFormatterLocales
+	}
+	RegisterXTextFormatters(r, r.rulesProvider, localesToRegister...)
+	RegisterCLDRFormatters(r, localesToRegister...)
 }
 
 func (r *FormatterRegistry) registerTypedProviders(providers map[string]TypedFormatterProvider) {
