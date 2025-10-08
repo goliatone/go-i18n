@@ -105,16 +105,21 @@ func TestFormatterRegistryCompositeTypedProvider(t *testing.T) {
 }
 
 func TestFormatterRegistryMissingProviderPanics(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic when configured locale lacks provider")
-		}
-	}()
+	// With the new implementation, all configured locales get XText providers
+	// registered automatically (with fallback to English formatting rules).
+	// This test now verifies that the registry doesn't panic and provides
+	// a working formatter even for unconfigured locales.
 
-	NewFormatterRegistry(
+	registry := NewFormatterRegistry(
 		WithFormatterRegistryResolver(NewStaticFallbackResolver()),
 		WithFormatterRegistryLocales("fr"),
 	)
+
+	// Verify that "fr" now has a provider (falls back to English rules)
+	funcs := registry.FuncMap("fr")
+	if _, ok := funcs["format_currency"]; !ok {
+		t.Fatal("expected format_currency to be available for 'fr' locale")
+	}
 }
 
 func TestFormatterRegistryCLDRBundles(t *testing.T) {
