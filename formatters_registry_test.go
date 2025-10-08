@@ -158,7 +158,7 @@ func TestFormatterRegistryCLDRBundles(t *testing.T) {
 		t.Fatalf("format_phone signature mismatch: %T", fmEs["format_phone"])
 	}
 
-	if got := phoneFn("es", "+34123456789"); got != "+34123456789" {
+	if got := phoneFn("es", "+34123456789"); got != "+34 123 456 789" {
 		t.Fatalf("format_phone es = %q", got)
 	}
 
@@ -179,7 +179,7 @@ func TestFormatterRegistryCLDRBundles(t *testing.T) {
 	}
 
 	phoneEn := fmEn["format_phone"].(func(string, string) string)
-	if got := phoneEn("en", "1234567890"); got != "1234567890" {
+	if got := phoneEn("en", "1234567890"); got != "+1 123 456 7890" {
 		t.Fatalf("format_phone en = %q", got)
 	}
 }
