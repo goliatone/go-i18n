@@ -477,7 +477,7 @@ func (r *FormatterRegistry) seedFallbacks() {
 			continue
 		}
 
-		if parents := deriveLocaleParents(locale); len(parents) > 0 {
+		if parents := localeParentChain(locale); len(parents) > 0 {
 			resolver.Set(locale, parents...)
 		}
 	}
