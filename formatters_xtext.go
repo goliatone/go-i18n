@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 // RegisterXTextFormatters registers locale aware formatters backed by golang.org/x/text
-func RegisterXTextFormatters(registry *FormatterRegistry, locales ...string) {
+func RegisterXTextFormatters(registry *FormatterRegistry, rulesProvider *FormattingRulesProvider, locales ...string) {
 	if registry == nil {
 		return
 	}
@@ -23,7 +24,7 @@ func RegisterXTextFormatters(registry *FormatterRegistry, locales ...string) {
 			continue
 		}
 
-		registry.RegisterTypedProvider(trimmed, newXTextProvider(trimmed))
+		registry.RegisterTypedProvider(trimmed, newXTextProvider(trimmed, rulesProvider))
 	}
 }
 
@@ -31,16 +32,27 @@ type xtextProvider struct {
 	locale       string
 	tag          language.Tag
 	printer      *message.Printer
+	rules        *FormattingRules
 	funcs        map[string]any
 	capabilities FormatterCapabilities
 }
 
-func newXTextProvider(locale string) *xtextProvider {
+func newXTextProvider(locale string, rulesProvider *FormattingRulesProvider) *xtextProvider {
 	tag := language.Make(locale)
+
+	// Load formatting rules
+	var rules *FormattingRules
+	if rulesProvider != nil {
+		rules = rulesProvider.Get(locale)
+	} else {
+		rules = loadFormattingRules(locale)
+	}
+
 	provider := &xtextProvider{
 		locale:  locale,
 		tag:     tag,
 		printer: message.NewPrinter(tag),
+		rules:   rules,
 	}
 
 	provider.capabilities = FormatterCapabilities{
@@ -103,59 +115,47 @@ func (p *xtextProvider) formatCurrency(_ string, amount float64, code string) st
 		return strings.ToUpper(code) + " " + p.formatNumber(p.locale, amount, 2)
 	}
 
+	// Format the amount using locale-specific number formatting
+	formattedAmount := p.formatNumber(p.locale, amount, 2)
+
+	// Get the currency symbol using golang.org/x/text/currency
 	value := unit.Amount(amount)
-	return p.printer.Sprintf("%v", currency.Symbol(value))
+	fullFormat := p.printer.Sprintf("%v", currency.Symbol(value))
+
+	// Extract symbol by removing the formatted amount from the full format
+	// This handles different symbol placements from the standard library
+	symbol := strings.TrimSpace(strings.ReplaceAll(fullFormat, formattedAmount, ""))
+	if symbol == "" {
+		symbol = unit.String() // Fallback to currency code
+	}
+
+	// Apply locale-specific symbol placement from our formatting rules
+	if p.rules != nil && p.rules.CurrencyRules.SymbolPosition == "after" {
+		return formattedAmount + " " + symbol
+	}
+
+	// Default: symbol before amount
+	return symbol + " " + formattedAmount
 }
 
 func (p *xtextProvider) formatDate(_ string, t time.Time) string {
-	if p.isSpanish() {
-		return fmt.Sprintf("%d de %s de %d", t.Day(), p.monthName(t.Month()), t.Year())
-	}
+	pattern := p.rules.DatePatterns.Pattern
+	monthName := p.rules.MonthNames[t.Month()-1]
 
-	return fmt.Sprintf("%s %d, %d", p.monthName(t.Month()), t.Day(), t.Year())
+	result := strings.ReplaceAll(pattern, "{day}", strconv.Itoa(t.Day()))
+	result = strings.ReplaceAll(result, "{month}", monthName)
+	result = strings.ReplaceAll(result, "{year}", strconv.Itoa(t.Year()))
+
+	return result
 }
 
 func (p *xtextProvider) formatTime(_ string, t time.Time) string {
-	if p.uses12HourClock() {
-		return t.Format("3:04 PM")
+	if p.rules.TimeFormat.Use24Hour {
+		return t.Format("15:04")
 	}
-	return t.Format("15:04")
+	return t.Format("3:04 PM")
 }
 
 func (p *xtextProvider) formatDateTime(locale string, t time.Time) string {
 	return fmt.Sprintf("%s %s", p.formatDate(locale, t), p.formatTime(locale, t))
-}
-
-func (p *xtextProvider) monthName(month time.Month) string {
-	if p.isSpanish() {
-		return spanishMonths[month-1]
-	}
-	return month.String()
-}
-
-var spanishBase, _ = language.Spanish.Base()
-
-func (p *xtextProvider) isSpanish() bool {
-	base, _ := p.tag.Base()
-	return base == spanishBase
-}
-
-func (p *xtextProvider) uses12HourClock() bool {
-	base, _ := p.tag.Base()
-	return base != spanishBase
-}
-
-var spanishMonths = []string{
-	"enero",
-	"febrero",
-	"marzo",
-	"abril",
-	"mayo",
-	"junio",
-	"julio",
-	"agosto",
-	"septiembre",
-	"octubre",
-	"noviembre",
-	"diciembre",
 }
