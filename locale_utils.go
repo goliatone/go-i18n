@@ -1,27 +1,70 @@
 package i18n
 
-import "sort"
+import (
+	"strings"
 
-// normalizeLocales removes duplicates and empty strings from a locale list,
-// then sorts the result alphabetically.
-func normalizeLocales(locales []string) []string {
-	if len(locales) == 0 {
+	"golang.org/x/text/language"
+)
+
+// localeParentTag returns the CLDR parent for the given locale.
+// Falls back to simple tag truncation if parsing fails.
+func localeParentTag(locale string) string {
+	if locale == "" {
+		return ""
+	}
+
+	tag, err := language.Parse(locale)
+	if err == nil {
+		parent := tag.Parent()
+		if parent == language.Und {
+			return ""
+		}
+		value := parent.String()
+		if value == "" || value == "und" {
+			return ""
+		}
+		return value
+	}
+
+	// Fallback to manual truncation when parsing fails.
+	if idx := strings.LastIndex(locale, "-"); idx > 0 {
+		return locale[:idx]
+	}
+	return ""
+}
+
+// localeParentChain returns all parents for the locale, ordered from closest parent to root.
+func localeParentChain(locale string) []string {
+	if locale == "" {
 		return nil
 	}
 
-	seen := make(map[string]struct{}, len(locales))
-	result := make([]string, 0, len(locales))
-	for _, locale := range locales {
-		if locale == "" {
-			continue
+	var chain []string
+	seen := make(map[string]struct{}, 4)
+
+	tag, err := language.Parse(locale)
+	if err == nil {
+		for parent := tag.Parent(); parent != language.Und; parent = parent.Parent() {
+			parentValue := parent.String()
+			if parentValue == "" || parentValue == "und" {
+				break
+			}
+			if _, exists := seen[parentValue]; exists {
+				break
+			}
+			seen[parentValue] = struct{}{}
+			chain = append(chain, parentValue)
 		}
-		if _, exists := seen[locale]; exists {
-			continue
-		}
-		seen[locale] = struct{}{}
-		result = append(result, locale)
 	}
 
-	sort.Strings(result)
-	return result
+	// Ensure canonical hyphen-based parents are also considered.
+	for current := localeParentTag(locale); current != ""; current = localeParentTag(current) {
+		if _, exists := seen[current]; exists {
+			continue
+		}
+		seen[current] = struct{}{}
+		chain = append(chain, current)
+	}
+
+	return chain
 }

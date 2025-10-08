@@ -1,9 +1,5 @@
 package i18n
 
-import (
-	"strings"
-)
-
 // Config captures translator and formatter setup
 type Config struct {
 	DefaultLocale string
@@ -327,7 +323,7 @@ func (cfg *Config) seedResolverFallbacks() {
 		if existing := resolver.Resolve(locale); existing != nil {
 			continue
 		}
-		chain := deriveLocaleParents(locale)
+		chain := localeParentChain(locale)
 		if len(chain) == 0 {
 			continue
 		}
@@ -380,27 +376,6 @@ func (cfg *Config) ensureFormatterRegistry() {
 	}
 
 	cfg.formatterRegistry = NewFormatterRegistry(options...)
-}
-
-func deriveLocaleParents(locale string) []string {
-	var chain []string
-	current := locale
-	for {
-		parent := collapseLocaleParent(current)
-		if parent == "" {
-			break
-		}
-		chain = append(chain, parent)
-		current = parent
-	}
-	return chain
-}
-
-func collapseLocaleParent(locale string) string {
-	if idx := strings.LastIndex(locale, "-"); idx > 0 {
-		return locale[:idx]
-	}
-	return ""
 }
 
 func (cfg *Config) ensureCultureService() {
