@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -101,6 +102,80 @@ func TestXTextProvider_FormattingRulesLoading(t *testing.T) {
 			}
 			if provider.rules.Locale != tt.expectedLang {
 				t.Errorf("rules.Locale = %q; want %q", provider.rules.Locale, tt.expectedLang)
+			}
+		})
+	}
+}
+
+func TestXTextProvider_FormatNumberAutoPrecision(t *testing.T) {
+	provider := newXTextProvider("es", nil)
+
+	tests := []struct {
+		value    float64
+		decimals int
+		want     string
+	}{
+		{value: 1.2, decimals: -1, want: "1,2"},
+		{value: 1234.5, decimals: -1, want: "1.234,5"},
+		{value: 1000, decimals: -1, want: "1.000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("value=%v", tt.value), func(t *testing.T) {
+			got := provider.formatNumber("es", tt.value, tt.decimals)
+			if got != tt.want {
+				t.Errorf("formatNumber(%v, %d) = %q; want %q", tt.value, tt.decimals, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestXTextProvider_FormatNumberNegative(t *testing.T) {
+	provider := newXTextProvider("es", nil)
+
+	tests := []struct {
+		name     string
+		value    float64
+		decimals int
+		want     string
+	}{
+		{
+			name:     "negative with thousand separator",
+			value:    -1234567.89,
+			decimals: 2,
+			want:     "-1.234.567,89",
+		},
+		{
+			name:     "small negative no thousand separator",
+			value:    -123.45,
+			decimals: 2,
+			want:     "-123,45",
+		},
+		{
+			name:     "large negative",
+			value:    -9876543.21,
+			decimals: 2,
+			want:     "-9.876.543,21",
+		},
+		{
+			name:     "negative integer",
+			value:    -5000,
+			decimals: 0,
+			want:     "-5.000",
+		},
+		{
+			name:     "negative auto precision",
+			value:    -1234.5,
+			decimals: -1,
+			want:     "-1.234,5",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := provider.formatNumber("es", tt.value, tt.decimals)
+			if got != tt.want {
+				t.Errorf("formatNumber(%v, %d) = %q; want %q", tt.value, tt.decimals, got, tt.want)
 			}
 		})
 	}
