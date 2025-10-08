@@ -97,11 +97,63 @@ func (p *xtextProvider) Capabilities() FormatterCapabilities {
 }
 
 func (p *xtextProvider) formatNumber(_ string, value float64, decimals int) string {
+	// If we have custom formatting rules, use them for decimal/thousand separators
+	if p.rules != nil {
+		return p.formatNumberWithRules(value, decimals)
+	}
+
+	// Fallback to golang.org/x/text formatting
 	opts := []number.Option{}
 	if decimals >= 0 {
 		opts = append(opts, number.MinFractionDigits(decimals), number.MaxFractionDigits(decimals))
 	}
 	return p.printer.Sprintf("%v", number.Decimal(value, opts...))
+}
+
+func (p *xtextProvider) formatNumberWithRules(value float64, decimals int) string {
+	if decimals < 0 {
+		decimals = 2
+	}
+
+	// Format with standard Go formatting first
+	formatted := fmt.Sprintf("%.*f", decimals, value)
+
+	// Apply custom separators
+	decimalSep := p.rules.CurrencyRules.DecimalSep
+	thousandSep := p.rules.CurrencyRules.ThousandSep
+
+	// Replace decimal separator
+	if decimalSep != "." {
+		formatted = strings.Replace(formatted, ".", decimalSep, 1)
+	}
+
+	// Add thousand separators if needed
+	if thousandSep != "" {
+		// Split into integer and decimal parts
+		parts := strings.Split(formatted, decimalSep)
+		integerPart := parts[0]
+
+		// Add thousand separators to integer part (from right to left)
+		if len(integerPart) > 3 {
+			var result strings.Builder
+			for i, digit := range integerPart {
+				if i > 0 && (len(integerPart)-i)%3 == 0 {
+					result.WriteString(thousandSep)
+				}
+				result.WriteRune(digit)
+			}
+			integerPart = result.String()
+		}
+
+		// Reconstruct the number
+		if len(parts) > 1 {
+			formatted = integerPart + decimalSep + parts[1]
+		} else {
+			formatted = integerPart
+		}
+	}
+
+	return formatted
 }
 
 func (p *xtextProvider) formatCurrency(_ string, amount float64, code string) string {
@@ -119,14 +171,30 @@ func (p *xtextProvider) formatCurrency(_ string, amount float64, code string) st
 	formattedAmount := p.formatNumber(p.locale, amount, 2)
 
 	// Get the currency symbol using golang.org/x/text/currency
+	// Try to extract symbol from x/text formatting
 	value := unit.Amount(amount)
 	fullFormat := p.printer.Sprintf("%v", currency.Symbol(value))
 
-	// Extract symbol by removing the formatted amount from the full format
-	// This handles different symbol placements from the standard library
-	symbol := strings.TrimSpace(strings.ReplaceAll(fullFormat, formattedAmount, ""))
-	if symbol == "" {
-		symbol = unit.String() // Fallback to currency code
+	// Extract symbol from the full format
+	// The fullFormat contains both the symbol and a formatted amount from x/text
+	opts := []number.Option{number.MinFractionDigits(2), number.MaxFractionDigits(2)}
+	xtextAmount := p.printer.Sprintf("%v", number.Decimal(amount, opts...))
+
+	// Remove the x/text formatted amount to get the symbol
+	symbol := strings.TrimSpace(strings.ReplaceAll(fullFormat, xtextAmount, ""))
+
+	// If symbol extraction failed or returned currency code, try a known locale
+	if symbol == "" || symbol == unit.String() {
+		// Try with English locale as fallback for symbol extraction
+		englishPrinter := message.NewPrinter(language.English)
+		englishFormat := englishPrinter.Sprintf("%v", currency.Symbol(value))
+		englishAmount := englishPrinter.Sprintf("%v", number.Decimal(amount, opts...))
+		symbol = strings.TrimSpace(strings.ReplaceAll(englishFormat, englishAmount, ""))
+
+		// Still no symbol? Use currency code
+		if symbol == "" {
+			symbol = unit.String()
+		}
 	}
 
 	// Apply locale-specific symbol placement from our formatting rules
