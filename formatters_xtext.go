@@ -111,12 +111,31 @@ func (p *xtextProvider) formatNumber(_ string, value float64, decimals int) stri
 }
 
 func (p *xtextProvider) formatNumberWithRules(value float64, decimals int) string {
+	if p.rules == nil {
+		// Fallback without rules
+		if decimals < 0 {
+			return strconv.FormatFloat(value, 'f', -1, 64)
+		}
+		return fmt.Sprintf("%.*f", decimals, value)
+	}
+
+	// Preserve caller intent: negative precision means "auto" semantics.
 	if decimals < 0 {
-		decimals = 2
+		// Use default conversion for auto precision, then swap separators.
+		formatted := strconv.FormatFloat(value, 'f', -1, 64)
+		return p.applySeparators(formatted)
 	}
 
 	// Format with standard Go formatting first
 	formatted := fmt.Sprintf("%.*f", decimals, value)
+
+	return p.applySeparators(formatted)
+}
+
+func (p *xtextProvider) applySeparators(formatted string) string {
+	if p.rules == nil {
+		return formatted
+	}
 
 	// Apply custom separators
 	decimalSep := p.rules.CurrencyRules.DecimalSep
@@ -133,6 +152,12 @@ func (p *xtextProvider) formatNumberWithRules(value float64, decimals int) strin
 		parts := strings.Split(formatted, decimalSep)
 		integerPart := parts[0]
 
+		// Handle negative sign separately
+		isNegative := strings.HasPrefix(integerPart, "-")
+		if isNegative {
+			integerPart = integerPart[1:] // Remove the minus sign
+		}
+
 		// Add thousand separators to integer part (from right to left)
 		if len(integerPart) > 3 {
 			var result strings.Builder
@@ -143,6 +168,11 @@ func (p *xtextProvider) formatNumberWithRules(value float64, decimals int) strin
 				result.WriteRune(digit)
 			}
 			integerPart = result.String()
+		}
+
+		// Restore negative sign if needed
+		if isNegative {
+			integerPart = "-" + integerPart
 		}
 
 		// Reconstruct the number
@@ -207,8 +237,22 @@ func (p *xtextProvider) formatCurrency(_ string, amount float64, code string) st
 }
 
 func (p *xtextProvider) formatDate(_ string, t time.Time) string {
+	// Fallback if rules are not available
+	if p.rules == nil || p.rules.DatePatterns.Pattern == "" {
+		return t.Format("2006-01-02")
+	}
+
 	pattern := p.rules.DatePatterns.Pattern
-	monthName := p.rules.MonthNames[t.Month()-1]
+
+	// Get month name with bounds checking
+	monthIndex := int(t.Month()) - 1
+	monthName := ""
+	if len(p.rules.MonthNames) > monthIndex && monthIndex >= 0 {
+		monthName = p.rules.MonthNames[monthIndex]
+	} else {
+		// Fallback to month number if names are not available
+		monthName = t.Month().String()
+	}
 
 	result := strings.ReplaceAll(pattern, "{day}", strconv.Itoa(t.Day()))
 	result = strings.ReplaceAll(result, "{month}", monthName)
@@ -218,6 +262,11 @@ func (p *xtextProvider) formatDate(_ string, t time.Time) string {
 }
 
 func (p *xtextProvider) formatTime(_ string, t time.Time) string {
+	// Fallback if rules are not available
+	if p.rules == nil {
+		return t.Format("15:04")
+	}
+
 	if p.rules.TimeFormat.Use24Hour {
 		return t.Format("15:04")
 	}
