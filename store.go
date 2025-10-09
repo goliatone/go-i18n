@@ -50,7 +50,7 @@ func NewStaticStore(data Translations) *StaticStore {
 		if catalog == nil {
 			continue
 		}
-		clone := &LocaleCatalog{
+		clone := &TranslationCatalog{
 			Locale: catalog.Locale,
 		}
 		if clone.Locale.Code == "" {
