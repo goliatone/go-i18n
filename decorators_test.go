@@ -165,7 +165,7 @@ func TestHookedTranslatorCapturesPluralMetadata(t *testing.T) {
 		},
 	}
 
-	catalog := &LocaleCatalog{
+	catalog := &TranslationCatalog{
 		Locale: Locale{Code: "en"},
 		Messages: map[string]Message{
 			"cart.items": {
@@ -233,7 +233,7 @@ func TestHookedTranslatorEmitsMissingPluralEvent(t *testing.T) {
 		},
 	}
 
-	catalog := &LocaleCatalog{
+	catalog := &TranslationCatalog{
 		Locale: Locale{Code: "en"},
 		Messages: map[string]Message{
 			"cart.items": {

@@ -3,6 +3,7 @@ package i18n
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -414,6 +415,220 @@ func TestConfig_TemplateHelpersWithCulture(t *testing.T) {
 
 	if _, ok := helpers["preferred_measurement"]; !ok {
 		t.Error("preferred_measurement helper not found")
+	}
+}
+
+func TestConfig_LocaleCatalogIntegration(t *testing.T) {
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"default_locale": "es-MX",
+		"locales": {
+			"en": {
+				"display_name": "English",
+				"active": true,
+				"fallbacks": ["es"]
+			},
+			"es": {
+				"display_name": "Español",
+				"fallbacks": ["en"]
+			},
+			"es-MX": {
+				"display_name": "Español (México)",
+				"active": true,
+				"fallbacks": ["es"],
+				"metadata": {
+					"currency": "MXN",
+					"beta": true
+				}
+			}
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithCultureData(cultureFile),
+		WithFallback("es-MX", "en"),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	expectedLocales := []string{"en", "es", "es-MX"}
+	if !reflect.DeepEqual(cfg.Locales, expectedLocales) {
+		t.Fatalf("Locales = %#v; want %#v", cfg.Locales, expectedLocales)
+	}
+
+	if cfg.DefaultLocale != "es-MX" {
+		t.Fatalf("DefaultLocale = %q; want es-MX", cfg.DefaultLocale)
+	}
+
+	catalog := cfg.LocaleCatalog()
+	if catalog == nil {
+		t.Fatal("LocaleCatalog() returned nil")
+	}
+
+	if catalog.DefaultLocale() != "es-MX" {
+		t.Fatalf("catalog.DefaultLocale() = %q; want es-MX", catalog.DefaultLocale())
+	}
+
+	if !reflect.DeepEqual(catalog.ActiveLocaleCodes(), expectedLocales) {
+		t.Fatalf("ActiveLocaleCodes = %#v; want %#v", catalog.ActiveLocaleCodes(), expectedLocales)
+	}
+
+	if name := catalog.DisplayName("es"); name != "Español" {
+		t.Fatalf("DisplayName(es) = %q; want Español", name)
+	}
+
+	meta := catalog.Metadata("es-MX")
+	if meta == nil {
+		t.Fatal("Metadata(es-MX) returned nil")
+	}
+	if currency, ok := meta["currency"]; !ok || currency != "MXN" {
+		t.Fatalf("Metadata(es-MX)[\"currency\"] = %v; want MXN", meta["currency"])
+	}
+	meta["currency"] = "USD"
+	if currency := catalog.Metadata("es-MX")["currency"]; currency != "MXN" {
+		t.Fatalf("Metadata copy mutated underlying map, got %v", currency)
+	}
+
+	if fallbacks := catalog.Fallbacks("es"); len(fallbacks) != 1 || fallbacks[0] != "en" {
+		t.Fatalf("Fallbacks(es) = %#v; want [\"en\"]", fallbacks)
+	}
+
+	resolver, ok := cfg.Resolver.(*StaticFallbackResolver)
+	if !ok {
+		t.Fatalf("expected StaticFallbackResolver, got %[1]T", cfg.Resolver)
+	}
+
+	chain := resolver.Resolve("es-MX")
+	if len(chain) != 1 || chain[0] != "en" {
+		t.Fatalf("Resolver fallback chain for es-MX = %#v; want [\"en\"]", chain)
+	}
+
+	chain = resolver.Resolve("es")
+	if len(chain) != 1 || chain[0] != "en" {
+		t.Fatalf("Resolver fallback chain for es = %#v; want [\"en\"]", chain)
+	}
+}
+
+func TestConfig_LocaleCatalogValidation(t *testing.T) {
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"default_locale": "en",
+		"locales": {
+			"en": {
+				"display_name": "English",
+				"active": true,
+				"fallbacks": ["fr"]
+			},
+			"es": {
+				"display_name": "Español",
+				"active": true
+			}
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	loader := NewCultureDataLoader(cultureFile)
+	data, err := loader.Load()
+	if err != nil {
+		t.Fatalf("Load culture data: %v", err)
+	}
+	if meta, ok := data.Locales["en"]; !ok {
+		t.Fatal("expected locale metadata for en")
+	} else if len(meta.Fallbacks) == 0 {
+		t.Fatal("locale metadata missing fallback for en")
+	}
+	if _, err := newLocaleCatalog(data.DefaultLocale, data.Locales); err == nil {
+		t.Fatal("expected newLocaleCatalog to error for undefined fallback")
+	}
+
+	if _, err := NewConfig(
+		WithCultureData(cultureFile),
+	); err == nil {
+		t.Fatal("expected error due to undefined fallback locale, got nil")
+	}
+}
+
+func TestConfig_LocaleCatalogDefaultMustBeActive(t *testing.T) {
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"default_locale": "en",
+		"locales": {
+			"en": {
+				"display_name": "English",
+				"active": false
+			},
+			"es": {
+				"display_name": "Español",
+				"active": true
+			}
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	if _, err := NewConfig(
+		WithCultureData(cultureFile),
+	); err == nil {
+		t.Fatal("expected error due to inactive default locale, got nil")
+	}
+}
+
+func TestConfig_LocaleCatalogWithLocalesOption(t *testing.T) {
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"default_locale": "en",
+		"locales": {
+			"en": {
+				"display_name": "English",
+				"active": true
+			},
+			"es": {
+				"display_name": "Español",
+				"active": true
+			}
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithCultureData(cultureFile),
+		WithLocales("es"),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	expected := []string{"es"}
+	if !reflect.DeepEqual(cfg.Locales, expected) {
+		t.Fatalf("Locales = %#v; want %#v", cfg.Locales, expected)
+	}
+
+	if _, err := NewConfig(
+		WithCultureData(cultureFile),
+		WithLocales("fr"),
+	); err == nil {
+		t.Fatal("expected error for unknown locale code, got nil")
 	}
 }
 
