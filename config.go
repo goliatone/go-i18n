@@ -1,5 +1,7 @@
 package i18n
 
+import "fmt"
+
 // Config captures translator and formatter setup
 type Config struct {
 	DefaultLocale       string
@@ -20,6 +22,8 @@ type Config struct {
 	cultureDataPath  string
 	cultureOverrides map[string]string
 	cultureService   CultureService
+	cultureData      *CultureData
+	localeCatalog    *LocaleCatalog
 }
 
 type pluralRuleLoader interface {
@@ -40,6 +44,10 @@ func NewConfig(opts ...Option) (*Config, error) {
 		if err := opt(cfg); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := cfg.applyLocaleCatalog(); err != nil {
+		return nil, err
 	}
 
 	cfg.normalizeLocales()
@@ -196,6 +204,8 @@ func WithCultureData(path string) Option {
 	return func(c *Config) error {
 		c.cultureDataPath = path
 		c.cultureService = nil // Invalidate cached service
+		c.cultureData = nil
+		c.localeCatalog = nil
 		return nil
 	}
 }
@@ -208,6 +218,8 @@ func WithCultureOverride(locale, path string) Option {
 		}
 		c.cultureOverrides[locale] = path
 		c.cultureService = nil // Invalidate cached service
+		c.cultureData = nil
+		c.localeCatalog = nil
 		return nil
 	}
 }
@@ -258,6 +270,14 @@ func (cfg *Config) CultureService() CultureService {
 	return cfg.cultureService
 }
 
+// LocaleCatalog exposes the immutable locale metadata snapshot loaded from culture data.
+func (cfg *Config) LocaleCatalog() *LocaleCatalog {
+	if cfg == nil {
+		return nil
+	}
+	return cfg.localeCatalog
+}
+
 func (cfg *Config) TemplateHelpers(t Translator, helperCfg HelperConfig) map[string]any {
 	if cfg == nil {
 		return TemplateHelpers(t, helperCfg)
@@ -281,6 +301,58 @@ func (cfg *Config) TemplateHelpers(t Translator, helperCfg HelperConfig) map[str
 	return result
 }
 
+func (cfg *Config) applyLocaleCatalog() error {
+	if cfg == nil {
+		return nil
+	}
+
+	data, err := cfg.loadCultureData()
+	if err != nil {
+		return err
+	}
+
+	catalog, err := newLocaleCatalog(data.DefaultLocale, data.Locales)
+	if err != nil {
+		return err
+	}
+	cfg.localeCatalog = catalog
+
+	if catalog == nil {
+		cfg.DefaultLocale = normalizeLocale(cfg.DefaultLocale)
+		return nil
+	}
+
+	if len(cfg.Locales) > 0 {
+		for i, locale := range cfg.Locales {
+			cfg.Locales[i] = normalizeLocale(locale)
+		}
+		for _, locale := range cfg.Locales {
+			if !catalog.Has(locale) {
+				return fmt.Errorf("i18n: locale %q is not defined in culture data", locale)
+			}
+		}
+	} else {
+		cfg.Locales = catalog.ActiveLocaleCodes()
+	}
+
+	if cfg.DefaultLocale != "" {
+		cfg.DefaultLocale = normalizeLocale(cfg.DefaultLocale)
+		if !catalog.Has(cfg.DefaultLocale) {
+			return fmt.Errorf("i18n: default locale %q is not defined in culture data", cfg.DefaultLocale)
+		}
+	} else if catalog.DefaultLocale() != "" {
+		cfg.DefaultLocale = catalog.DefaultLocale()
+	}
+
+	if cfg.DefaultLocale != "" && !catalog.IsActive(cfg.DefaultLocale) {
+		return fmt.Errorf("i18n: default locale %q is not marked active", cfg.DefaultLocale)
+	}
+
+	cfg.applyCatalogFallbacks(catalog)
+
+	return nil
+}
+
 func (cfg *Config) applyPluralRuleOptions() {
 	if !cfg.enablePlural || len(cfg.pluralRules) == 0 || cfg.Loader == nil {
 		return
@@ -288,6 +360,32 @@ func (cfg *Config) applyPluralRuleOptions() {
 
 	if loader, ok := cfg.Loader.(pluralRuleLoader); ok {
 		cfg.Loader = loader.WithPluralRules(cfg.pluralRules...)
+	}
+}
+
+func (cfg *Config) applyCatalogFallbacks(catalog *LocaleCatalog) {
+	if cfg == nil || catalog == nil {
+		return
+	}
+
+	resolver, ok := cfg.Resolver.(*StaticFallbackResolver)
+	if !ok {
+		if cfg.Resolver != nil {
+			return
+		}
+		resolver = NewStaticFallbackResolver()
+		cfg.Resolver = resolver
+	}
+
+	for _, locale := range catalog.AllLocaleCodes() {
+		if chain := resolver.Resolve(locale); len(chain) > 0 {
+			continue
+		}
+		fallbacks := catalog.Fallbacks(locale)
+		if len(fallbacks) == 0 {
+			continue
+		}
+		resolver.Set(locale, fallbacks...)
 	}
 }
 
@@ -356,15 +454,9 @@ func (cfg *Config) ensureFormatterRegistry() {
 	}
 
 	// Load culture data and create formatting rules provider
-	var cultureData *CultureData
-	if cfg.cultureDataPath != "" {
-		loader := NewCultureDataLoader(cfg.cultureDataPath)
-		for locale, path := range cfg.cultureOverrides {
-			loader.AddOverride(locale, path)
-		}
-		if data, err := loader.Load(); err == nil {
-			cultureData = data
-		}
+	cultureData, err := cfg.loadCultureData()
+	if err != nil {
+		cultureData = &CultureData{}
 	}
 
 	rulesProvider := NewFormattingRulesProvider(cultureData, cfg.Resolver)
@@ -392,18 +484,7 @@ func (cfg *Config) ensureCultureService() {
 		return
 	}
 
-	if cfg.cultureDataPath == "" {
-		// No culture data configured, use empty service
-		cfg.cultureService = NewCultureService(&CultureData{}, cfg.Resolver)
-		return
-	}
-
-	loader := NewCultureDataLoader(cfg.cultureDataPath)
-	for locale, path := range cfg.cultureOverrides {
-		loader.AddOverride(locale, path)
-	}
-
-	data, err := loader.Load()
+	data, err := cfg.loadCultureData()
 	if err != nil {
 		// Log error but don't fail - use empty service
 		cfg.cultureService = NewCultureService(&CultureData{}, cfg.Resolver)
@@ -411,4 +492,33 @@ func (cfg *Config) ensureCultureService() {
 	}
 
 	cfg.cultureService = NewCultureService(data, cfg.Resolver)
+}
+
+func (cfg *Config) loadCultureData() (*CultureData, error) {
+	if cfg == nil {
+		return &CultureData{}, nil
+	}
+
+	if cfg.cultureData != nil {
+		return cfg.cultureData, nil
+	}
+
+	loader := cfg.newCultureDataLoader()
+	data, err := loader.Load()
+	if err != nil {
+		return nil, err
+	}
+	if data == nil {
+		data = &CultureData{}
+	}
+	cfg.cultureData = data
+	return data, nil
+}
+
+func (cfg *Config) newCultureDataLoader() *CultureDataLoader {
+	loader := NewCultureDataLoader(cfg.cultureDataPath)
+	for locale, path := range cfg.cultureOverrides {
+		loader.AddOverride(locale, path)
+	}
+	return loader
 }
