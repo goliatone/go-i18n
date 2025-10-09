@@ -70,6 +70,28 @@ func mergeCultureDataInto(dest, source *CultureData) {
 		return
 	}
 
+	if source.SchemaVersion != "" {
+		dest.SchemaVersion = source.SchemaVersion
+	}
+
+	if source.DefaultLocale != "" {
+		dest.DefaultLocale = source.DefaultLocale
+	}
+
+	if len(source.Locales) > 0 {
+		if dest.Locales == nil {
+			dest.Locales = make(map[string]LocaleDefinition, len(source.Locales))
+		}
+		for code, definition := range source.Locales {
+			existing, ok := dest.Locales[code]
+			if !ok {
+				dest.Locales[code] = cloneLocaleDefinition(definition)
+				continue
+			}
+			dest.Locales[code] = mergeLocaleDefinition(existing, definition)
+		}
+	}
+
 	if source.CurrencyCodes != nil {
 		if dest.CurrencyCodes == nil {
 			dest.CurrencyCodes = make(map[string]string, len(source.CurrencyCodes))
@@ -135,4 +157,80 @@ func (l *CultureDataLoader) loadOverride(base *CultureData, locale, path string)
 	mergeCultureDataInto(base, &override)
 
 	return nil
+}
+
+func mergeLocaleDefinition(base, override LocaleDefinition) LocaleDefinition {
+	result := cloneLocaleDefinition(base)
+
+	if override.DisplayName != "" {
+		result.DisplayName = override.DisplayName
+	}
+
+	if override.Active != nil {
+		result.Active = cloneBool(override.Active)
+	}
+
+	if override.Fallbacks != nil {
+		result.Fallbacks = cloneStrings(override.Fallbacks)
+	}
+
+	if override.Metadata != nil {
+		if result.Metadata == nil {
+			result.Metadata = make(map[string]any, len(override.Metadata))
+		}
+		for key, value := range override.Metadata {
+			result.Metadata[key] = value
+		}
+	}
+
+	return result
+}
+
+func cloneLocaleDefinition(definition LocaleDefinition) LocaleDefinition {
+	clone := LocaleDefinition{
+		DisplayName: definition.DisplayName,
+	}
+
+	if definition.Active != nil {
+		clone.Active = cloneBool(definition.Active)
+	}
+
+	if len(definition.Fallbacks) > 0 {
+		clone.Fallbacks = cloneStrings(definition.Fallbacks)
+	}
+
+	if len(definition.Metadata) > 0 {
+		clone.Metadata = cloneMetadata(definition.Metadata)
+	}
+
+	return clone
+}
+
+func cloneStrings(input []string) []string {
+	if len(input) == 0 {
+		return nil
+	}
+	out := make([]string, len(input))
+	copy(out, input)
+	return out
+}
+
+func cloneMetadata(input map[string]any) map[string]any {
+	if len(input) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(input))
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneBool(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	out := new(bool)
+	*out = *value
+	return out
 }
