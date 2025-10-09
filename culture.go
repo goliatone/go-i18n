@@ -1,16 +1,25 @@
 package i18n
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // CultureData contains locale-specific business/cultural information
 type CultureData struct {
+	SchemaVersion          string                         `json:"schema_version"`
+	DefaultLocale          string                         `json:"default_locale"`
+	Locales                map[string]LocaleDefinition    `json:"locales"`
 	CurrencyCodes          map[string]string              `json:"currency_codes"`
 	SupportNumbers         map[string]string              `json:"support_numbers"`
 	Lists                  map[string]map[string][]string `json:"lists"`
 	MeasurementPreferences map[string]MeasurementPrefs    `json:"measurement_preferences"`
 	FormattingRules        map[string]FormattingRules     `json:"formatting_rules"`
+}
+
+// LocaleDefinition represents the raw locale metadata as defined in culture data files.
+type LocaleDefinition struct {
+	DisplayName string         `json:"display_name"`
+	Active      *bool          `json:"active,omitempty"`
+	Fallbacks   []string       `json:"fallbacks,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
 // MeasurementPrefs defines preferred units for a locale
