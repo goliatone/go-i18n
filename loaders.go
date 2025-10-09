@@ -69,7 +69,7 @@ func (l *FileLoader) Load() (Translations, error) {
 
 	catalogs := make(Translations, len(buckets))
 	for locale, messages := range buckets {
-		catalog := &LocaleCatalog{
+		catalog := &TranslationCatalog{
 			Locale: Locale{Code: locale},
 		}
 		if len(messages) > 0 {
