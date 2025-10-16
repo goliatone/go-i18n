@@ -1,10 +1,11 @@
 {
-  "currency_codes": {
-    "en": "USD",
-    "es": "EUR",
-    "es-MX": "MXN",
-    "el": "EUR",
-    "ar": "AED"
+  "currencies": {
+    "default": { "code": "USD", "symbol": "$" },
+    "en": { "code": "USD", "symbol": "$" },
+    "es": { "code": "EUR", "symbol": "€" },
+    "es-MX": { "code": "MXN", "symbol": "$" },
+    "el": { "code": "EUR", "symbol": "€" },
+    "ar": { "code": "AED", "symbol": "د.إ" }
   },
   "support_numbers": {
     "en": "+1 555 010 4242",
@@ -24,34 +25,25 @@
   },
   "measurement_preferences": {
     "default": {
-      "weight": {
-        "unit": "kg"
-      },
-      "distance": {
-        "unit": "km"
-      },
-      "volume": {
-        "unit": "l"
-      }
+      "weight": { "unit": "kg", "symbol": "kg" },
+      "distance": { "unit": "km", "symbol": "km" },
+      "volume": { "unit": "l", "symbol": "L" }
     },
     "en": {
       "weight": {
         "unit": "lb",
-        "conversion_from": {
-          "kg": 2.20462
-        }
+        "symbol": "lb",
+        "conversion_from": { "kg": 2.20462 }
       },
       "distance": {
         "unit": "mi",
-        "conversion_from": {
-          "km": 0.621371
-        }
+        "symbol": "mi",
+        "conversion_from": { "km": 0.621371 }
       },
       "volume": {
         "unit": "gal",
-        "conversion_from": {
-          "l": 0.264172
-        }
+        "symbol": "gal",
+        "conversion_from": { "l": 0.264172 }
       }
     }
   }
