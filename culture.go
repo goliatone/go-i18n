@@ -4,14 +4,14 @@ import "fmt"
 
 // CultureData contains locale-specific business/cultural information
 type CultureData struct {
-	SchemaVersion          string                         `json:"schema_version"`
-	DefaultLocale          string                         `json:"default_locale"`
-	Locales                map[string]LocaleDefinition    `json:"locales"`
-	CurrencyCodes          map[string]string              `json:"currency_codes"`
-	SupportNumbers         map[string]string              `json:"support_numbers"`
-	Lists                  map[string]map[string][]string `json:"lists"`
-	MeasurementPreferences map[string]MeasurementPrefs    `json:"measurement_preferences"`
-	FormattingRules        map[string]FormattingRules     `json:"formatting_rules"`
+	SchemaVersion          string                              `json:"schema_version"`
+	DefaultLocale          string                              `json:"default_locale"`
+	Locales                map[string]LocaleDefinition         `json:"locales"`
+	Currencies             map[string]CurrencyInfo             `json:"currencies"`
+	SupportNumbers         map[string]string                   `json:"support_numbers"`
+	Lists                  map[string]map[string][]string      `json:"lists"`
+	MeasurementPreferences map[string]MeasurementPreferenceSet `json:"measurement_preferences"`
+	FormattingRules        map[string]FormattingRules          `json:"formatting_rules"`
 }
 
 // LocaleDefinition represents the raw locale metadata as defined in culture data files.
@@ -22,16 +22,19 @@ type LocaleDefinition struct {
 	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
-// MeasurementPrefs defines preferred units for a locale
-type MeasurementPrefs struct {
-	Weight   UnitPreference `json:"weight"`
-	Distance UnitPreference `json:"distance"`
-	Volume   UnitPreference `json:"volume"`
+// CurrencyInfo describes currency metadata for a locale.
+type CurrencyInfo struct {
+	Code   string `json:"code"`
+	Symbol string `json:"symbol"`
 }
+
+// MeasurementPreferenceSet groups unit preferences by measurement type.
+type MeasurementPreferenceSet map[string]UnitPreference
 
 // UnitPreference specifies preferred unit and conversion
 type UnitPreference struct {
 	Unit           string             `json:"unit"`
+	Symbol         string             `json:"symbol"`
 	ConversionFrom map[string]float64 `json:"conversion_from,omitempty"`
 }
 
@@ -39,6 +42,9 @@ type UnitPreference struct {
 type CultureService interface {
 	// GetCurrencyCode returns the currency code for a locale
 	GetCurrencyCode(locale string) (string, error)
+
+	// GetCurrency returns currency metadata for a locale
+	GetCurrency(locale string) (CurrencyInfo, error)
 
 	// GetSupportNumber returns the support contact for a locale
 	GetSupportNumber(locale string) (string, error)
@@ -50,7 +56,7 @@ type CultureService interface {
 	GetMeasurementPreference(locale, measurementType string) (*UnitPreference, error)
 
 	// ConvertMeasurement converts a value to the preferred unit for a locale
-	ConvertMeasurement(locale string, value float64, fromUnit, measurementType string) (float64, string, error)
+	ConvertMeasurement(locale string, value float64, fromUnit, measurementType string) (float64, string, string, error)
 }
 
 // cultureService implements CultureService
@@ -67,17 +73,41 @@ func NewCultureService(data *CultureData, resolver FallbackResolver) CultureServ
 	}
 }
 
-// GetCurrencyCode returns the currency code for a locale
-func (s *cultureService) GetCurrencyCode(locale string) (string, error) {
+// GetCurrency returns the currency metadata for a locale.
+func (s *cultureService) GetCurrency(locale string) (CurrencyInfo, error) {
+	if s.data == nil || s.data.Currencies == nil {
+		return CurrencyInfo{}, fmt.Errorf("no currency for locale %q", locale)
+	}
+
 	candidates := s.resolveCandidates(locale)
 
 	for _, candidate := range candidates {
-		if code, ok := s.data.CurrencyCodes[candidate]; ok {
-			return code, nil
+		if info, ok := s.data.Currencies[candidate]; ok {
+			if info.Code != "" || info.Symbol != "" {
+				return info, nil
+			}
 		}
 	}
 
-	return "", fmt.Errorf("no currency code for locale %q", locale)
+	if info, ok := s.data.Currencies["default"]; ok {
+		if info.Code != "" || info.Symbol != "" {
+			return info, nil
+		}
+	}
+
+	return CurrencyInfo{}, fmt.Errorf("no currency for locale %q", locale)
+}
+
+// GetCurrencyCode returns the currency code for a locale
+func (s *cultureService) GetCurrencyCode(locale string) (string, error) {
+	info, err := s.GetCurrency(locale)
+	if err != nil {
+		return "", err
+	}
+	if info.Code == "" {
+		return "", fmt.Errorf("no currency code for locale %q", locale)
+	}
+	return info.Code, nil
 }
 
 // GetSupportNumber returns the support contact for a locale
@@ -183,26 +213,13 @@ func (s *cultureService) selectMeasurementPreference(locales []string, measureme
 
 	for _, candidate := range locales {
 		prefs, ok := s.data.MeasurementPreferences[candidate]
-		if !ok {
+		if !ok || prefs == nil {
 			continue
 		}
 
-		switch measurementType {
-		case "weight":
-			pref := prefs.Weight
-			if pref.Unit != "" {
-				return &pref
-			}
-		case "distance":
-			pref := prefs.Distance
-			if pref.Unit != "" {
-				return &pref
-			}
-		case "volume":
-			pref := prefs.Volume
-			if pref.Unit != "" {
-				return &pref
-			}
+		if pref, ok := prefs[measurementType]; ok && pref.Unit != "" {
+			copy := pref
+			return &copy
 		}
 	}
 
@@ -210,25 +227,25 @@ func (s *cultureService) selectMeasurementPreference(locales []string, measureme
 }
 
 // ConvertMeasurement converts a value to the preferred unit for a locale
-func (s *cultureService) ConvertMeasurement(locale string, value float64, fromUnit, measurementType string) (float64, string, error) {
+func (s *cultureService) ConvertMeasurement(locale string, value float64, fromUnit, measurementType string) (float64, string, string, error) {
 	pref, err := s.GetMeasurementPreference(locale, measurementType)
 	if err != nil {
-		return value, fromUnit, err
+		return value, fromUnit, "", err
 	}
 
 	// If already in preferred unit, return as-is
 	if pref.Unit == fromUnit {
-		return value, fromUnit, nil
+		return value, pref.Unit, pref.Symbol, nil
 	}
 
 	// Try to find conversion factor
 	if pref.ConversionFrom != nil {
 		if factor, ok := pref.ConversionFrom[fromUnit]; ok {
-			return value * factor, pref.Unit, nil
+			return value * factor, pref.Unit, pref.Symbol, nil
 		}
 	}
 
-	return value, fromUnit, fmt.Errorf("no conversion from %q to %q", fromUnit, pref.Unit)
+	return value, fromUnit, pref.Symbol, fmt.Errorf("no conversion from %q to %q", fromUnit, pref.Unit)
 }
 
 // resolveCandidates returns the list of locale candidates to try
