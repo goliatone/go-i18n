@@ -10,7 +10,19 @@ func CultureHelpers(service CultureService, localeKey string) map[string]any {
 	return map[string]any{
 		"resolve_currency": func(data any) (string, error) {
 			locale := extractLocale(data, localeKey)
-			return service.GetCurrencyCode(locale)
+			info, err := service.GetCurrency(locale)
+			if err != nil {
+				return "", err
+			}
+			if info.Symbol != "" {
+				return info.Symbol, nil
+			}
+			return info.Code, nil
+		},
+
+		"currency_info": func(data any) (CurrencyInfo, error) {
+			locale := extractLocale(data, localeKey)
+			return service.GetCurrency(locale)
 		},
 
 		"culture_value": func(data any, key string) (string, error) {
@@ -32,12 +44,16 @@ func CultureHelpers(service CultureService, localeKey string) map[string]any {
 
 		"preferred_measurement": func(data any, value float64, fromUnit, measurementType string) (string, error) {
 			locale := extractLocale(data, localeKey)
-			converted, unit, err := service.ConvertMeasurement(locale, value, fromUnit, measurementType)
+			converted, unit, symbol, err := service.ConvertMeasurement(locale, value, fromUnit, measurementType)
 			if err != nil {
 				return "", err
 			}
+			displayUnit := symbol
+			if displayUnit == "" {
+				displayUnit = unit
+			}
 			// Use measurement formatter so locale-specific separators are applied.
-			return FormatMeasurement(locale, converted, unit), nil
+			return FormatMeasurement(locale, converted, displayUnit), nil
 		},
 	}
 }
