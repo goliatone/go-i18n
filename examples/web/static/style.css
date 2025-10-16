@@ -209,6 +209,17 @@ body.rtl .card {
     margin-right: 8px;
 }
 
+.currency-code {
+    font-weight: 600;
+    color: #495057;
+    margin-left: 6px;
+}
+
+body.rtl .currency-code {
+    margin-left: 0;
+    margin-right: 6px;
+}
+
 footer {
     background: #343a40;
     color: white;
