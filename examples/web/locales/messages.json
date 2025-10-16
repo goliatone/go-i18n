@@ -23,7 +23,11 @@
     "demo.total": "Cart total",
     "demo.percent": "Discount progress",
     "demo.measurement": "Package weight",
-    "demo.phone": "Support line"
+    "demo.phone": "Support line",
+    "demo.locale": "Locale name",
+    "demo.fallbacks": "Fallback chain",
+    "demo.no_fallbacks": "No fallback locales",
+    "language.beta": "Beta"
   },
   "es": {
     "site.title": "Bienvenido a nuestro sitio",
@@ -49,7 +53,11 @@
     "demo.total": "Total del carrito",
     "demo.percent": "Progreso del descuento",
     "demo.measurement": "Peso del paquete",
-    "demo.phone": "Línea de soporte"
+    "demo.phone": "Línea de soporte",
+    "demo.locale": "Nombre de la configuración regional",
+    "demo.fallbacks": "Cadena de respaldo",
+    "demo.no_fallbacks": "Sin configuraciones regionales de respaldo",
+    "language.beta": "Beta"
   },
   "el": {
     "site.title": "Καλώς ήρθατε στον ιστότοπό μας",
@@ -75,7 +83,11 @@
     "demo.total": "Σύνολο καλαθιού",
     "demo.percent": "Πρόοδος έκπτωσης",
     "demo.measurement": "Βάρος δέματος",
-    "demo.phone": "Γραμμή υποστήριξης"
+    "demo.phone": "Γραμμή υποστήριξης",
+    "demo.locale": "Όνομα τοπικής ρύθμισης",
+    "demo.fallbacks": "Ακολουθία εναλλακτικών",
+    "demo.no_fallbacks": "Δεν υπάρχουν εναλλακτικές τοπικές ρυθμίσεις",
+    "language.beta": "Beta"
   },
   "ar": {
     "site.title": "مرحبا بك في موقعنا",
@@ -105,6 +117,10 @@
     "demo.total": "إجمالي السلة",
     "demo.percent": "تقدم الخصم",
     "demo.measurement": "وزن الطرد",
-    "demo.phone": "خط الدعم"
+    "demo.phone": "خط الدعم",
+    "demo.locale": "اسم اللغة",
+    "demo.fallbacks": "سلسلة اللغات الاحتياطية",
+    "demo.no_fallbacks": "لا توجد لغات احتياطية",
+    "language.beta": "تجريبي"
   }
 }

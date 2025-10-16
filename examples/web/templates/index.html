@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="{{.Locale}}" dir="{{if eq .Locale "ar"}}rtl{{else}}ltr{{end}}">
+<html lang="{{.Locale}}" dir="{{if .IsRTL}}rtl{{else}}ltr{{end}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="{{if eq .Locale "ar"}}rtl{{end}}">
+<body class="{{if .IsRTL}}rtl{{end}}">
     <div class="container">
         <header>
             <h1>{{t .Locale "site.title"}}</h1>
@@ -15,11 +15,12 @@
 
         <nav class="language-switcher">
             <span class="lang-label">{{t .Locale "language.select"}}</span>
-            <a href="?lang=en" class="lang-btn {{if eq .Locale "en"}}active{{end}}">English</a>
-            <a href="?lang=es" class="lang-btn {{if eq .Locale "es"}}active{{end}}">Español</a>
-            <a href="?lang=es-MX" class="lang-btn {{if eq .Locale "es-MX"}}active{{end}}">Español (MX)</a>
-            <a href="?lang=el" class="lang-btn {{if eq .Locale "el"}}active{{end}}">Ελληνικά</a>
-            <a href="?lang=ar" class="lang-btn {{if eq .Locale "ar"}}active{{end}}">العربية</a>
+            {{range .Locales}}
+            <a href="?lang={{.Code}}" class="lang-btn {{if eq $.Locale .Code}}active{{end}}">
+                {{.Label}}
+                {{if .Beta}}<span class="lang-badge">{{t $.Locale "language.beta"}}</span>{{end}}
+            </a>
+            {{end}}
         </nav>
 
         <nav class="main-nav">
@@ -52,7 +53,7 @@
             <section class="demo-info">
                 <h3>{{t .Locale "demo.section.title"}}</h3>
                 <ul>
-                    <li><strong>Current Locale:</strong> {{.Locale}}</li>
+                    <li><strong>{{t .Locale "demo.locale"}}:</strong> {{.LocaleName}} ({{.Locale}})</li>
                     <li><strong>User Name:</strong> {{.UserName}}</li>
                     <li><strong>{{t .Locale "demo.date"}}:</strong> {{format_date .Locale .OrderDate}}</li>
                     <li><strong>{{t .Locale "demo.list"}}:</strong> {{format_list .Locale (culture_list . "trending_products")}}</li>
@@ -60,6 +61,9 @@
                     <li><strong>{{t .Locale "demo.percent"}}:</strong> {{format_percent .Locale .Completion 2}}</li>
                     <li><strong>{{t .Locale "demo.measurement"}}:</strong> {{preferred_measurement . .CartWeight "kg" "weight"}}</li>
                     <li><strong>{{t .Locale "demo.phone"}}:</strong> {{format_phone .Locale (culture_value . "support_number")}}</li>
+                    <li><strong>{{t .Locale "demo.fallbacks"}}:</strong>
+                        {{if .FallbackChain}}{{.FallbackChain}}{{else}}{{t .Locale "demo.no_fallbacks"}}{{end}}
+                    </li>
                 </ul>
             </section>
         </main>

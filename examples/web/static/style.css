@@ -84,6 +84,23 @@ header h1 {
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+.lang-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: #ff6b6b;
+    color: white;
+    border-radius: 999px;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+body.rtl .lang-badge {
+    margin-left: 0;
+    margin-right: 8px;
+}
+
 .main-nav {
     background: white;
     padding: 20px 30px;

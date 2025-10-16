@@ -1,4 +1,38 @@
 {
+  "schema_version": "1",
+  "default_locale": "en",
+  "locales": {
+    "en": {
+      "display_name": "English",
+      "active": true
+    },
+    "es": {
+      "display_name": "Español",
+      "active": true,
+      "fallbacks": ["en"]
+    },
+    "es-MX": {
+      "display_name": "Español (México)",
+      "active": true,
+      "fallbacks": ["es"],
+      "metadata": {
+        "beta": true
+      }
+    },
+    "el": {
+      "display_name": "Ελληνικά",
+      "active": true,
+      "fallbacks": ["en"]
+    },
+    "ar": {
+      "display_name": "العربية",
+      "active": true,
+      "fallbacks": ["en"],
+      "metadata": {
+        "rtl": true
+      }
+    }
+  },
   "currency_codes": {
     "en": "USD",
     "es": "EUR",
