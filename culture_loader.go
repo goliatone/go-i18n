@@ -92,11 +92,13 @@ func mergeCultureDataInto(dest, source *CultureData) {
 		}
 	}
 
-	if source.CurrencyCodes != nil {
-		if dest.CurrencyCodes == nil {
-			dest.CurrencyCodes = make(map[string]string, len(source.CurrencyCodes))
+	if source.Currencies != nil {
+		if dest.Currencies == nil {
+			dest.Currencies = make(map[string]CurrencyInfo, len(source.Currencies))
 		}
-		maps.Copy(dest.CurrencyCodes, source.CurrencyCodes)
+		for locale, info := range source.Currencies {
+			dest.Currencies[locale] = info
+		}
 	}
 
 	if source.SupportNumbers != nil {
@@ -123,9 +125,18 @@ func mergeCultureDataInto(dest, source *CultureData) {
 
 	if source.MeasurementPreferences != nil {
 		if dest.MeasurementPreferences == nil {
-			dest.MeasurementPreferences = make(map[string]MeasurementPrefs, len(source.MeasurementPreferences))
+			dest.MeasurementPreferences = make(map[string]MeasurementPreferenceSet, len(source.MeasurementPreferences))
 		}
-		maps.Copy(dest.MeasurementPreferences, source.MeasurementPreferences)
+		for locale, prefs := range source.MeasurementPreferences {
+			if prefs == nil {
+				continue
+			}
+			if existing, ok := dest.MeasurementPreferences[locale]; ok && existing != nil {
+				mergeMeasurementPreferenceSet(existing, prefs)
+			} else {
+				dest.MeasurementPreferences[locale] = cloneMeasurementPreferenceSet(prefs)
+			}
+		}
 	}
 
 	if source.FormattingRules != nil {
@@ -232,5 +243,39 @@ func cloneBool(value *bool) *bool {
 	}
 	out := new(bool)
 	*out = *value
+	return out
+}
+
+func mergeMeasurementPreferenceSet(dest MeasurementPreferenceSet, source MeasurementPreferenceSet) {
+	if dest == nil || source == nil {
+		return
+	}
+	for measurement, pref := range source {
+		dest[measurement] = cloneUnitPreference(pref)
+	}
+}
+
+func cloneMeasurementPreferenceSet(source MeasurementPreferenceSet) MeasurementPreferenceSet {
+	if len(source) == 0 {
+		return nil
+	}
+	out := make(MeasurementPreferenceSet, len(source))
+	for measurement, pref := range source {
+		out[measurement] = cloneUnitPreference(pref)
+	}
+	return out
+}
+
+func cloneUnitPreference(pref UnitPreference) UnitPreference {
+	out := UnitPreference{
+		Unit:   pref.Unit,
+		Symbol: pref.Symbol,
+	}
+	if len(pref.ConversionFrom) > 0 {
+		out.ConversionFrom = make(map[string]float64, len(pref.ConversionFrom))
+		for unit, factor := range pref.ConversionFrom {
+			out.ConversionFrom[unit] = factor
+		}
+	}
 	return out
 }
