@@ -242,6 +242,27 @@ func TestCultureService_GetMeasurementPreference(t *testing.T) {
 	}
 }
 
+func TestCultureService_GetMeasurementPreference_DefaultPrecedesFallback(t *testing.T) {
+	loader := NewCultureDataLoader(filepath.Join("testdata", "culture", "example_culture_data.json"))
+	data, err := loader.Load()
+	if err != nil {
+		t.Fatalf("Load culture data: %v", err)
+	}
+
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("es", "en")
+
+	service := NewCultureService(data, resolver)
+
+	pref, err := service.GetMeasurementPreference("es", "weight")
+	if err != nil {
+		t.Fatalf("GetMeasurementPreference: %v", err)
+	}
+	if pref.Unit != "kg" {
+		t.Errorf("GetMeasurementPreference(es, weight) unit = %q; want kg", pref.Unit)
+	}
+}
+
 func TestCultureService_ConvertMeasurement(t *testing.T) {
 	loader := NewCultureDataLoader(filepath.Join("testdata", "culture", "example_culture_data.json"))
 	data, err := loader.Load()

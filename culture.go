@@ -120,39 +120,93 @@ func (s *cultureService) GetMeasurementPreference(locale, measurementType string
 		return nil, fmt.Errorf("no measurement preferences configured")
 	}
 
-	candidates := s.resolveCandidates(locale)
-	searchOrder := make([]string, 0, len(candidates)+1)
-	if len(candidates) > 0 {
-		searchOrder = append(searchOrder, candidates...)
-	}
-	if _, ok := s.data.MeasurementPreferences["default"]; ok {
-		searchOrder = append(searchOrder, "default")
-	}
-	if len(searchOrder) == 0 {
-		searchOrder = append(searchOrder, "default")
+	primary := s.collectLocaleChain(locale, nil)
+	if pref := s.selectMeasurementPreference(primary, measurementType); pref != nil {
+		return pref, nil
 	}
 
-	for _, candidate := range searchOrder {
-		if prefs, ok := s.data.MeasurementPreferences[candidate]; ok {
-			var pref *UnitPreference
-			switch measurementType {
-			case "weight":
-				pref = &prefs.Weight
-			case "distance":
-				pref = &prefs.Distance
-			case "volume":
-				pref = &prefs.Volume
-			default:
-				continue
+	if pref := s.selectMeasurementPreference([]string{"default"}, measurementType); pref != nil {
+		return pref, nil
+	}
+
+	var fallbackChain []string
+	if s.resolver != nil {
+		seen := make(map[string]struct{})
+		for _, code := range primary {
+			seen[code] = struct{}{}
+		}
+		for _, fallback := range s.resolver.Resolve(locale) {
+			fallbackChain = append(fallbackChain, s.collectLocaleChain(fallback, seen)...)
+		}
+	}
+
+	if pref := s.selectMeasurementPreference(fallbackChain, measurementType); pref != nil {
+		return pref, nil
+	}
+
+	return nil, fmt.Errorf("no measurement preference for %q in locale %q", measurementType, locale)
+}
+
+func (s *cultureService) collectLocaleChain(locale string, seen map[string]struct{}) []string {
+	if locale == "" {
+		return nil
+	}
+
+	if seen == nil {
+		seen = make(map[string]struct{})
+	}
+
+	appendLocale := func(dst *[]string, value string) {
+		if value == "" {
+			return
+		}
+		if _, exists := seen[value]; exists {
+			return
+		}
+		seen[value] = struct{}{}
+		*dst = append(*dst, value)
+	}
+
+	var chain []string
+	appendLocale(&chain, locale)
+	for _, parent := range localeParentChain(locale) {
+		appendLocale(&chain, parent)
+	}
+
+	return chain
+}
+
+func (s *cultureService) selectMeasurementPreference(locales []string, measurementType string) *UnitPreference {
+	if len(locales) == 0 {
+		return nil
+	}
+
+	for _, candidate := range locales {
+		prefs, ok := s.data.MeasurementPreferences[candidate]
+		if !ok {
+			continue
+		}
+
+		switch measurementType {
+		case "weight":
+			pref := prefs.Weight
+			if pref.Unit != "" {
+				return &pref
 			}
-
-			if pref != nil && pref.Unit != "" {
-				return pref, nil
+		case "distance":
+			pref := prefs.Distance
+			if pref.Unit != "" {
+				return &pref
+			}
+		case "volume":
+			pref := prefs.Volume
+			if pref.Unit != "" {
+				return &pref
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("no measurement preference for %q in locale %q", measurementType, locale)
+	return nil
 }
 
 // ConvertMeasurement converts a value to the preferred unit for a locale
