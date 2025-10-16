@@ -268,11 +268,11 @@ func TestConfig_CultureService(t *testing.T) {
 	cultureFile := filepath.Join(tmpDir, "culture.json")
 
 	cultureData := `{
-		"currency_codes": {
-			"en": "USD",
-			"es": "EUR"
-		}
-	}`
+	"currencies": {
+		"en": { "code": "USD", "symbol": "$" },
+		"es": { "code": "EUR", "symbol": "€" }
+	}
+}`
 
 	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
 		t.Fatalf("write culture file: %v", err)
@@ -308,17 +308,17 @@ func TestConfig_CultureServiceWithOverride(t *testing.T) {
 	overrideFile := filepath.Join(tmpDir, "override.json")
 
 	cultureData := `{
-		"currency_codes": {
-			"en": "USD",
-			"es": "EUR"
-		}
-	}`
+	"currencies": {
+		"en": { "code": "USD", "symbol": "$" },
+		"es": { "code": "EUR", "symbol": "€" }
+	}
+}`
 
 	overrideData := `{
-		"currency_codes": {
-			"en": "GBP"
-		}
-	}`
+	"currencies": {
+		"en": { "code": "GBP", "symbol": "£" }
+	}
+}`
 
 	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
 		t.Fatalf("write culture file: %v", err)
@@ -367,14 +367,27 @@ func TestConfig_TemplateHelpersWithCulture(t *testing.T) {
 	cultureFile := filepath.Join(tmpDir, "culture.json")
 
 	cultureData := `{
-		"currency_codes": {
-			"en": "USD",
-			"es": "EUR"
+		"currencies": {
+			"default": { "code": "USD", "symbol": "$" },
+			"en": { "code": "USD", "symbol": "$" },
+			"es": { "code": "EUR", "symbol": "€" }
 		},
 		"lists": {
 			"trending": {
 				"en": ["coffee", "tea"],
 				"es": ["café", "té"]
+			}
+		},
+		"measurement_preferences": {
+			"default": {
+				"weight": { "unit": "kg", "symbol": "kg" }
+			},
+			"en": {
+				"weight": {
+					"unit": "lb",
+					"symbol": "lb",
+					"conversion_from": { "kg": 2.20462 }
+				}
 			}
 		}
 	}`
@@ -405,6 +418,10 @@ func TestConfig_TemplateHelpersWithCulture(t *testing.T) {
 		t.Error("resolve_currency helper not found")
 	}
 
+	if _, ok := helpers["currency_info"]; !ok {
+		t.Error("currency_info helper not found")
+	}
+
 	if _, ok := helpers["culture_value"]; !ok {
 		t.Error("culture_value helper not found")
 	}
@@ -415,6 +432,24 @@ func TestConfig_TemplateHelpersWithCulture(t *testing.T) {
 
 	if _, ok := helpers["preferred_measurement"]; !ok {
 		t.Error("preferred_measurement helper not found")
+	}
+
+	resolve := helpers["resolve_currency"].(func(any) (string, error))
+	symbol, err := resolve(map[string]any{"Locale": "es"})
+	if err != nil {
+		t.Fatalf("resolve_currency: %v", err)
+	}
+	if symbol != "€" {
+		t.Fatalf("resolve_currency returned %q; want €", symbol)
+	}
+
+	infoFunc := helpers["currency_info"].(func(any) (CurrencyInfo, error))
+	info, err := infoFunc(map[string]any{"Locale": "es"})
+	if err != nil {
+		t.Fatalf("currency_info: %v", err)
+	}
+	if info.Code != "EUR" || info.Symbol != "€" {
+		t.Fatalf("currency_info returned %+v; want code=EUR symbol=€", info)
 	}
 }
 

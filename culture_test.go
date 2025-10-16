@@ -20,39 +20,46 @@ func TestCultureService_GetCurrencyCode(t *testing.T) {
 	service := NewCultureService(data, resolver)
 
 	tests := []struct {
-		name     string
-		locale   string
-		expected string
-		wantErr  bool
+		name           string
+		locale         string
+		expectedCode   string
+		expectedSymbol string
+		wantErr        bool
 	}{
 		{
-			name:     "en_locale",
-			locale:   "en",
-			expected: "USD",
-			wantErr:  false,
+			name:           "en_locale",
+			locale:         "en",
+			expectedCode:   "USD",
+			expectedSymbol: "$",
+			wantErr:        false,
 		},
 		{
-			name:     "es_locale",
-			locale:   "es",
-			expected: "EUR",
-			wantErr:  false,
+			name:           "es_locale",
+			locale:         "es",
+			expectedCode:   "EUR",
+			expectedSymbol: "€",
+			wantErr:        false,
 		},
 		{
-			name:     "es-MX_locale",
-			locale:   "es-MX",
-			expected: "MXN",
-			wantErr:  false,
+			name:           "es-MX_locale",
+			locale:         "es-MX",
+			expectedCode:   "MXN",
+			expectedSymbol: "$",
+			wantErr:        false,
 		},
 		{
-			name:     "el_locale",
-			locale:   "el",
-			expected: "EUR",
-			wantErr:  false,
+			name:           "el_locale",
+			locale:         "el",
+			expectedCode:   "EUR",
+			expectedSymbol: "€",
+			wantErr:        false,
 		},
 		{
-			name:    "unknown_locale_no_fallback",
-			locale:  "fr",
-			wantErr: true,
+			name:           "unknown_locale_defaults",
+			locale:         "fr",
+			expectedCode:   "USD",
+			expectedSymbol: "$",
+			wantErr:        false,
 		},
 	}
 
@@ -63,8 +70,23 @@ func TestCultureService_GetCurrencyCode(t *testing.T) {
 				t.Errorf("GetCurrencyCode() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr && got != tt.expected {
-				t.Errorf("GetCurrencyCode(%q) = %q; want %q", tt.locale, got, tt.expected)
+			if tt.wantErr {
+				if _, err := service.GetCurrency(tt.locale); err == nil {
+					t.Errorf("GetCurrency(%q) expected error", tt.locale)
+				}
+				return
+			}
+
+			if got != tt.expectedCode {
+				t.Errorf("GetCurrencyCode(%q) = %q; want %q", tt.locale, got, tt.expectedCode)
+			}
+
+			info, err := service.GetCurrency(tt.locale)
+			if err != nil {
+				t.Fatalf("GetCurrency(%q) unexpected error: %v", tt.locale, err)
+			}
+			if info.Code != tt.expectedCode || info.Symbol != tt.expectedSymbol {
+				t.Errorf("GetCurrency(%q) = %+v; want code=%q symbol=%q", tt.locale, info, tt.expectedCode, tt.expectedSymbol)
 			}
 		})
 	}
@@ -261,6 +283,9 @@ func TestCultureService_GetMeasurementPreference_DefaultPrecedesFallback(t *test
 	if pref.Unit != "kg" {
 		t.Errorf("GetMeasurementPreference(es, weight) unit = %q; want kg", pref.Unit)
 	}
+	if pref.Symbol != "kg" {
+		t.Errorf("GetMeasurementPreference(es, weight) symbol = %q; want kg", pref.Symbol)
+	}
 }
 
 func TestCultureService_ConvertMeasurement(t *testing.T) {
@@ -280,6 +305,7 @@ func TestCultureService_ConvertMeasurement(t *testing.T) {
 		measurementType string
 		expectedValue   float64
 		expectedUnit    string
+		expectedSymbol  string
 		wantErr         bool
 	}{
 		{
@@ -290,6 +316,7 @@ func TestCultureService_ConvertMeasurement(t *testing.T) {
 			measurementType: "weight",
 			expectedValue:   6.062705,
 			expectedUnit:    "lb",
+			expectedSymbol:  "lb",
 			wantErr:         false,
 		},
 		{
@@ -300,6 +327,7 @@ func TestCultureService_ConvertMeasurement(t *testing.T) {
 			measurementType: "weight",
 			expectedValue:   2.75,
 			expectedUnit:    "kg",
+			expectedSymbol:  "kg",
 			wantErr:         false,
 		},
 		{
@@ -310,13 +338,14 @@ func TestCultureService_ConvertMeasurement(t *testing.T) {
 			measurementType: "distance",
 			expectedValue:   6.21371,
 			expectedUnit:    "mi",
+			expectedSymbol:  "mi",
 			wantErr:         false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotValue, gotUnit, err := service.ConvertMeasurement(tt.locale, tt.value, tt.fromUnit, tt.measurementType)
+			gotValue, gotUnit, gotSymbol, err := service.ConvertMeasurement(tt.locale, tt.value, tt.fromUnit, tt.measurementType)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ConvertMeasurement() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -324,6 +353,9 @@ func TestCultureService_ConvertMeasurement(t *testing.T) {
 			if !tt.wantErr {
 				if gotUnit != tt.expectedUnit {
 					t.Errorf("ConvertMeasurement() unit = %q; want %q", gotUnit, tt.expectedUnit)
+				}
+				if gotSymbol != tt.expectedSymbol {
+					t.Errorf("ConvertMeasurement() symbol = %q; want %q", gotSymbol, tt.expectedSymbol)
 				}
 				// Check value with tolerance for floating point
 				if diff := gotValue - tt.expectedValue; diff > 0.0001 || diff < -0.0001 {
@@ -340,10 +372,10 @@ func TestCultureDataLoader_Override(t *testing.T) {
 	overridePath := filepath.Join(tmpDir, "override.json")
 
 	overrideData := `{
-		"currency_codes": {
-			"en": "GBP"
-		}
-	}`
+	"currencies": {
+		"en": { "code": "GBP", "symbol": "£" }
+	}
+}`
 
 	if err := os.WriteFile(overridePath, []byte(overrideData), 0644); err != nil {
 		t.Fatalf("Write override file: %v", err)
@@ -358,13 +390,13 @@ func TestCultureDataLoader_Override(t *testing.T) {
 	}
 
 	// Verify the override was applied
-	if code := data.CurrencyCodes["en"]; code != "GBP" {
-		t.Errorf("Override not applied: CurrencyCodes[en] = %q; want GBP", code)
+	if info := data.Currencies["en"]; info.Code != "GBP" || info.Symbol != "£" {
+		t.Errorf("Override not applied: Currencies[en] = %+v; want GBP/£", info)
 	}
 
 	// Verify other data is still intact
-	if code := data.CurrencyCodes["es"]; code != "EUR" {
-		t.Errorf("Original data lost: CurrencyCodes[es] = %q; want EUR", code)
+	if info := data.Currencies["es"]; info.Code != "EUR" || info.Symbol != "€" {
+		t.Errorf("Original data lost: Currencies[es] = %+v; want EUR/€", info)
 	}
 }
 
