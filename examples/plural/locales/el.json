@@ -1,0 +1,13 @@
+{
+  "el": {
+    "order.heading": "Geia sou %s!",
+    "cart.items": {
+      "one": "{count} item ready for pickup.",
+      "other": "{count} items ready for pickup."
+    },
+    "alerts.pending": {
+      "other": "{count} alerts on hold."
+    },
+    "inventory.message": "H warehouse lists %d units."
+  }
+}

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="{{.Locale}}" dir="{{if .IsRTL}}rtl{{else}}ltr{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="{{if .IsRTL}}rtl{{end}}">
+    <div class="container">
+        <header>
+            <h1>{{t .Locale "site.title"}}</h1>
+            <p class="subtitle">{{t .Locale "site.description"}}</p>
+        </header>
+
+        <nav class="language-switcher">
+            <span class="lang-label">{{t .Locale "language.select"}}</span>
+            {{range .Locales}}
+            <a href="?lang={{.Code}}" class="lang-btn {{if eq $.Locale .Code}}active{{end}}">
+                {{.Label}}
+                {{if .Beta}}<span class="lang-badge">{{t $.Locale "language.beta"}}</span>{{end}}
+            </a>
+            {{end}}
+        </nav>
+
+        <nav class="main-nav">
+            <a href="?lang={{.Locale}}">{{t .Locale "nav.home"}}</a>
+            <a href="?lang={{.Locale}}&page=about">{{t .Locale "nav.about"}}</a>
+            <a href="?lang={{.Locale}}&page=contact">{{t .Locale "nav.contact"}}</a>
+        </nav>
+
+        <main>
+            <section class="welcome">
+                <h2>{{t .Locale "home.heading" .UserName}}</h2>
+                <p class="intro">{{t .Locale "home.greeting"}}</p>
+                <p>{{t .Locale "home.description"}}</p>
+            </section>
+
+            <section class="info-cards">
+                <div class="card">
+                    <h3>{{t .Locale "about.heading"}}</h3>
+                    <p>{{t .Locale "about.content"}}</p>
+                </div>
+
+                <div class="card">
+                    <h3>{{t .Locale "nav.contact"}}</h3>
+                    {{$items := translate_count .Locale "items.count" .ItemCount}}
+                    <p>{{$items.text}}</p>
+                    <p class="date">{{t .Locale "date.today" (format_date .Locale .OrderDate)}}</p>
+                </div>
+            </section>
+
+            {{$currency := currency_info .}}
+            <section class="demo-info">
+                <h3>{{t .Locale "demo.section.title"}}</h3>
+                <ul>
+                    <li><strong>{{t .Locale "demo.locale"}}:</strong> {{.LocaleName}} ({{.Locale}})</li>
+                    <li><strong>User Name:</strong> {{.UserName}}</li>
+                    <li><strong>{{t .Locale "demo.date"}}:</strong> {{format_date .Locale .OrderDate}}</li>
+                    <li><strong>{{t .Locale "demo.list"}}:</strong> {{format_list .Locale (culture_list . "trending_products")}}</li>
+                    <li><strong>{{t .Locale "demo.total"}}:</strong> {{format_currency .Locale .CartTotal (resolve_currency .)}} <span class="currency-code">({{$currency.Code}})</span></li>
+                    <li><strong>{{t .Locale "demo.percent"}}:</strong> {{format_percent .Locale .Completion 2}}</li>
+                    <li><strong>{{t .Locale "demo.measurement"}}:</strong> {{preferred_measurement . .CartWeight "kg" "weight"}}</li>
+                    <li><strong>{{t .Locale "demo.phone"}}:</strong> {{format_phone .Locale (culture_value . "support_number")}}</li>
+                    <li><strong>{{t .Locale "demo.fallbacks"}}:</strong>
+                        {{if .FallbackChain}}{{.FallbackChain}}{{else}}{{t .Locale "demo.no_fallbacks"}}{{end}}
+                    </li>
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <p>{{t .Locale "footer.copyright"}}</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,120 @@
+{
+  "schema_version": "1",
+  "default_locale": "en",
+  "locales": {
+    "en": {
+      "display_name": "English",
+      "active": true
+    },
+    "es": {
+      "display_name": "Español",
+      "active": true,
+      "fallbacks": ["en"]
+    },
+    "es-MX": {
+      "display_name": "Español (México)",
+      "active": true,
+      "fallbacks": ["es"],
+      "metadata": {
+        "beta": true
+      }
+    },
+    "el": {
+      "display_name": "Ελληνικά",
+      "active": true,
+      "fallbacks": ["en"]
+    },
+    "ar": {
+      "display_name": "العربية",
+      "active": true,
+      "fallbacks": ["en"],
+      "metadata": {
+        "rtl": true
+      }
+    }
+  },
+  "currencies": {
+    "default": { "code": "USD", "symbol": "$" },
+    "en": { "code": "USD", "symbol": "$" },
+    "es": { "code": "EUR", "symbol": "€" },
+    "es-MX": { "code": "MXN", "symbol": "$" },
+    "el": { "code": "EUR", "symbol": "€" },
+    "ar": { "code": "AED", "symbol": "د.إ" }
+  },
+  "support_numbers": {
+    "en": "+1 555 010 4242",
+    "es": "+34 900 123 456",
+    "es-MX": "+52 55 1234 5678",
+    "el": "+30 210 123 4567",
+    "ar": "+971 4 123 4567"
+  },
+  "lists": {
+    "trending_products": {
+      "en": ["coffee", "tea", "cake"],
+      "es": ["café", "té", "pastel"],
+      "es-MX": ["café", "pan dulce", "chocolate"],
+      "el": ["καφές", "τσάι", "κέικ"],
+      "ar": ["قهوة", "شاي", "كعكة"]
+    }
+  },
+  "measurement_preferences": {
+    "default": {
+      "weight": { "unit": "kg", "symbol": "kg" }
+    },
+    "en": {
+      "weight": {
+        "unit": "lb",
+        "symbol": "lb",
+        "conversion_from": { "kg": 2.20462 }
+      }
+    }
+  },
+  "formatting_rules": {
+    "el": {
+      "locale": "el",
+      "date_patterns": {
+        "pattern": "{day}/{month}/{year}",
+        "day_first": true,
+        "month_style": "number"
+      },
+      "currency_rules": {
+        "pattern": "{amount} {symbol}",
+        "symbol_position": "after",
+        "decimal_separator": ",",
+        "thousand_separator": ".",
+        "decimals": 2
+      },
+      "month_names": [
+        "Ιανουαρίου", "Φεβρουαρίου", "Μαρτίου", "Απριλίου", "Μαΐου", "Ιουνίου",
+        "Ιουλίου", "Αυγούστου", "Σεπτεμβρίου", "Οκτωβρίου", "Νοεμβρίου", "Δεκεμβρίου"
+      ],
+      "time_format": {
+        "use_24_hour": true,
+        "pattern": "15:04"
+      }
+    },
+    "ar": {
+      "locale": "ar",
+      "date_patterns": {
+        "pattern": "{day}/{month}/{year}",
+        "day_first": true,
+        "month_style": "number"
+      },
+      "currency_rules": {
+        "pattern": "{amount} {symbol}",
+        "symbol_position": "after",
+        "decimal_separator": ".",
+        "thousand_separator": ",",
+        "decimals": 2
+      },
+      "month_names": [
+        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+      ],
+      "time_format": {
+        "use_24_hour": false,
+        "pattern": "3:04 PM"
+      }
+    }
+  }
+}

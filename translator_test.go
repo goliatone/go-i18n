@@ -96,7 +96,7 @@ func TestSimpleTranslatorPluralSelection(t *testing.T) {
 		},
 	}
 
-	catalog := &LocaleCatalog{
+	catalog := &TranslationCatalog{
 		Locale: Locale{Code: "en"},
 		Messages: map[string]Message{
 			"cart.items": {
@@ -160,7 +160,7 @@ func TestSimpleTranslatorPluralFallbackToOther(t *testing.T) {
 		},
 	}
 
-	catalog := &LocaleCatalog{
+	catalog := &TranslationCatalog{
 		Locale: Locale{Code: "en"},
 		Messages: map[string]Message{
 			"invite.count": {

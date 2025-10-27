@@ -1,12 +1,12 @@
 package i18n
 
-type LocaleCatalog struct {
+type TranslationCatalog struct {
 	Locale        Locale
 	Messages      map[string]Message
 	CardinalRules *PluralRuleSet
 }
 
-type Translations map[string]*LocaleCatalog
+type Translations map[string]*TranslationCatalog
 
 // Locale metadata placeholder pending richer implementation
 type Locale struct {

@@ -3,6 +3,7 @@ package i18n
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // MissingTranslationHandler decides what string should be emitted when
@@ -21,11 +22,52 @@ type HelperConfig struct {
 	TemplateHelperKey string
 }
 
-// TemplateHelpers exposes translator + formatter helpers for go-template
+type defaultLocaleProvider interface {
+	DefaultLocale() string
+}
+
+func determineDefaultFormatterLocale(t Translator, registry *FormatterRegistry) string {
+	if provider, ok := t.(defaultLocaleProvider); ok {
+		if locale := provider.DefaultLocale(); locale != "" {
+			return locale
+		}
+	}
+
+	if registry != nil {
+		if locale := registry.defaultLocale(); locale != "" {
+			return locale
+		}
+	}
+
+	if len(defaultFormatterLocales) > 0 {
+		return defaultFormatterLocales[0]
+	}
+
+	return ""
+}
+
+// TemplateHelpers exposes translator + formatter helpers for go-template.
+//
+// For production use, supply a properly configured Registry via HelperConfig.Registry
+// or use Config.TemplateHelpers() which automatically configures fallback resolution
+// for regional locale variants (e.g., es-MX → es → en).
+//
+// When cfg.Registry is nil, this function creates a minimal registry with automatic
+// parent-chain fallback resolution (e.g., zh-Hant-HK → zh-Hant → zh).
 func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 	registry := cfg.Registry
 	if registry == nil {
-		registry = NewFormatterRegistry()
+		// Determine the default locale for ultimate fallback
+		defaultLocale := determineDefaultFormatterLocale(t, nil)
+		if defaultLocale == "" {
+			defaultLocale = "en"
+		}
+
+		// Create a registry with automatic parent-chain fallback
+		// (e.g., zh-Hant-HK → zh-Hant → zh → [default])
+		registry = NewFormatterRegistry(
+			WithFormatterRegistryResolver(newLanguageFallbackResolver(defaultLocale)),
+		)
 	}
 
 	helpers := make(map[string]any)
@@ -92,11 +134,21 @@ func TemplateHelpers(t Translator, cfg HelperConfig) map[string]any {
 		return resolveLocale(localeSrc, cfg.LocaleKey)
 	}
 
-	for name, fn := range registry.FuncMap("") {
+	defaultLocale := determineDefaultFormatterLocale(t, registry)
+
+	helpers["formatter_funcs"] = func(localeSrc any) map[string]any {
+		locale := resolveLocale(localeSrc, cfg.LocaleKey)
+		if locale == "" {
+			locale = defaultLocale
+		}
+		return registry.FuncMap(locale)
+	}
+
+	for name, fn := range registry.FuncMap(defaultLocale) {
 		if fn == nil {
 			continue
 		}
-		helpers[name] = wrapFormatter(registry, name, fn)
+		helpers[name] = wrapFormatter(registry, defaultLocale, name, fn)
 	}
 
 	return helpers
@@ -119,7 +171,6 @@ func (h helperCall) optionArgs() []any {
 	if !h.hasCount {
 		return nil
 	}
-
 	return []any{WithCount(h.count)}
 }
 
@@ -127,14 +178,15 @@ func prepareTranslateCall(params ...any) helperCall {
 	call := helperCall{}
 
 	for _, param := range params {
-		if count, ok := extractCountOption(param); ok {
+		if count, options, ok := extractCountOption(param); ok {
 			call.hasCount = true
 			call.count = count
-			if residual := removeKnownOptions(param, "count"); residual != nil {
+			if residual := removeKnownOptions(options, "count"); residual != nil {
 				call.args = append(call.args, residual)
 			}
 			continue
 		}
+
 		call.args = append(call.args, param)
 	}
 
@@ -155,45 +207,45 @@ func executeTemplateTranslation(t Translator, locale, key string, call helperCal
 	if mt, ok := t.(metadataTranslator); ok {
 		return mt.TranslateWithMetadata(locale, key, args...)
 	}
+
 	result, err := t.Translate(locale, key, args...)
 	return result, nil, err
 }
 
-func extractCountOption(param any) (any, bool) {
-	clone, ok := toStringMap(param)
+func extractCountOption(param any) (any, map[string]any, bool) {
+	options, ok := toStringMap(param)
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 
-	value, exists := clone["count"]
+	value, exists := options["count"]
 	if !exists {
-		return nil, false
+		return nil, nil, false
 	}
-	return value, true
+
+	return value, options, true
 }
 
-func removeKnownOptions(param any, keys ...string) any {
-	clone, ok := toStringMap(param)
-	if !ok {
-		return param
-	}
-	for _, key := range keys {
-		delete(clone, key)
-	}
-	if len(clone) == 0 {
+func removeKnownOptions(options map[string]any, keys ...string) any {
+	if len(options) == 0 {
 		return nil
 	}
-	return clone
+
+	for _, key := range keys {
+		delete(options, key)
+	}
+
+	if len(options) == 0 {
+		return nil
+	}
+
+	return options
 }
 
 func toStringMap(param any) (map[string]any, bool) {
 	switch value := param.(type) {
 	case map[string]any:
-		clone := make(map[string]any, len(value))
-		for k, v := range value {
-			clone[k] = v
-		}
-		return clone, true
+		return cloneStringKeyMap(value), true
 	case map[any]any:
 		clone := make(map[string]any, len(value))
 		for k, v := range value {
@@ -207,6 +259,17 @@ func toStringMap(param any) (map[string]any, bool) {
 	default:
 		return nil, false
 	}
+}
+
+func cloneStringKeyMap(input map[string]any) map[string]any {
+	if len(input) == 0 {
+		return map[string]any{}
+	}
+	clone := make(map[string]any, len(input))
+	for k, v := range input {
+		clone[k] = v
+	}
+	return clone
 }
 
 func stringifyMapKey(key any) (string, bool) {
@@ -299,7 +362,7 @@ func resolveLocale(src any, key string) string {
 	return ""
 }
 
-func wrapFormatter(registry *FormatterRegistry, name string, base any) any {
+func wrapFormatter(registry *FormatterRegistry, defaultLocale, name string, base any) any {
 	baseValue := reflect.ValueOf(base)
 	if !baseValue.IsValid() || baseValue.Kind() != reflect.Func {
 		return base
@@ -311,6 +374,9 @@ func wrapFormatter(registry *FormatterRegistry, name string, base any) any {
 		locale := ""
 		if len(args) > 0 && args[0].Kind() == reflect.String {
 			locale = args[0].String()
+		}
+		if locale == "" {
+			locale = defaultLocale
 		}
 
 		impl, ok := registry.Formatter(name, locale)
@@ -327,4 +393,35 @@ func wrapFormatter(registry *FormatterRegistry, name string, base any) any {
 	})
 
 	return wrapper.Interface()
+}
+
+type languageFallbackResolver struct {
+	defaultLocale string
+}
+
+func newLanguageFallbackResolver(defaultLocale string) *languageFallbackResolver {
+	return &languageFallbackResolver{defaultLocale: defaultLocale}
+}
+
+func (r *languageFallbackResolver) Resolve(locale string) []string {
+	if locale == "" {
+		return nil
+	}
+
+	chain := localeParentChain(locale)
+
+	if r.defaultLocale != "" && !strings.EqualFold(locale, r.defaultLocale) {
+		hasDefault := false
+		for _, candidate := range chain {
+			if strings.EqualFold(candidate, r.defaultLocale) {
+				hasDefault = true
+				break
+			}
+		}
+		if !hasDefault {
+			chain = append(chain, r.defaultLocale)
+		}
+	}
+
+	return chain
 }

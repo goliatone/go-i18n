@@ -169,6 +169,13 @@ func (t *SimpleTranslator) Translate(locale, key string, args ...any) (string, e
 	return result, err
 }
 
+func (t *SimpleTranslator) DefaultLocale() string {
+	if t == nil {
+		return ""
+	}
+	return t.defaultLocale
+}
+
 func (t *SimpleTranslator) TranslateWithMetadata(locale, key string, args ...any) (string, map[string]any, error) {
 	if t == nil {
 		return "", nil, ErrMissingTranslation
@@ -239,7 +246,7 @@ func (t *SimpleTranslator) lookupLocales(primary string) []string {
 
 	appendLocale(primary)
 
-	for parent := parentLocaleTag(primary); parent != ""; parent = parentLocaleTag(parent) {
+	for parent := localeParentTag(primary); parent != ""; parent = localeParentTag(parent) {
 		appendLocale(parent)
 	}
 
@@ -339,7 +346,7 @@ func (t *SimpleTranslator) ruleSetFor(locale string) *PluralRuleSet {
 		if rules, ok := t.store.Rules(current); ok {
 			return rules
 		}
-		base := parentLocaleTag(current)
+		base := localeParentTag(current)
 		if base == current {
 			break
 		}
@@ -353,13 +360,6 @@ func (t *SimpleTranslator) ruleSetFor(locale string) *PluralRuleSet {
 	}
 
 	return nil
-}
-
-func parentLocaleTag(locale string) string {
-	if idx := strings.LastIndex(locale, "-"); idx > 0 {
-		return locale[:idx]
-	}
-	return ""
 }
 
 func selectPluralCategory(rules *PluralRuleSet, operands pluralOperands) PluralCategory {
@@ -516,25 +516,25 @@ func isInteger(value float64) bool {
 func toPluralOperands(value any) (pluralOperands, string, bool) {
 	switch v := value.(type) {
 	case int:
-		return buildOperandsFromLiteral(strconv.FormatInt(int64(v), 10))
+		return convertSignedInt(int64(v))
 	case int8:
-		return buildOperandsFromLiteral(strconv.FormatInt(int64(v), 10))
+		return convertSignedInt(int64(v))
 	case int16:
-		return buildOperandsFromLiteral(strconv.FormatInt(int64(v), 10))
+		return convertSignedInt(int64(v))
 	case int32:
-		return buildOperandsFromLiteral(strconv.FormatInt(int64(v), 10))
+		return convertSignedInt(int64(v))
 	case int64:
-		return buildOperandsFromLiteral(strconv.FormatInt(v, 10))
+		return convertSignedInt(v)
 	case uint:
-		return buildOperandsFromLiteral(strconv.FormatUint(uint64(v), 10))
+		return convertUnsignedInt(uint64(v))
 	case uint8:
-		return buildOperandsFromLiteral(strconv.FormatUint(uint64(v), 10))
+		return convertUnsignedInt(uint64(v))
 	case uint16:
-		return buildOperandsFromLiteral(strconv.FormatUint(uint64(v), 10))
+		return convertUnsignedInt(uint64(v))
 	case uint32:
-		return buildOperandsFromLiteral(strconv.FormatUint(uint64(v), 10))
+		return convertUnsignedInt(uint64(v))
 	case uint64:
-		return buildOperandsFromLiteral(strconv.FormatUint(v, 10))
+		return convertUnsignedInt(v)
 	case float32:
 		if math.IsNaN(float64(v)) || math.IsInf(float64(v), 0) {
 			return pluralOperands{}, "", false
@@ -552,6 +552,14 @@ func toPluralOperands(value any) (pluralOperands, string, bool) {
 	default:
 		return pluralOperands{}, "", false
 	}
+}
+
+func convertSignedInt(v int64) (pluralOperands, string, bool) {
+	return buildOperandsFromLiteral(strconv.FormatInt(v, 10))
+}
+
+func convertUnsignedInt(v uint64) (pluralOperands, string, bool) {
+	return buildOperandsFromLiteral(strconv.FormatUint(v, 10))
 }
 
 func buildOperandsFromLiteral(raw string) (pluralOperands, string, bool) {
