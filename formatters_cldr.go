@@ -16,20 +16,20 @@ func RegisterCLDRFormatters(registry *FormatterRegistry, locales ...string) {
 	}
 
 	for _, locale := range locales {
-		trimmed := strings.TrimSpace(locale)
-		if trimmed == "" {
+		normalized := NormalizeLocale(locale)
+		if normalized == "" {
 			continue
 		}
 
-		if bundle, ok := cldrBundles[trimmed]; ok {
+		if bundle, ok := cldrBundles[normalized]; ok {
 			localBundle := bundle
-			if plan, exists := DefaultPhoneDialPlan(trimmed); exists {
+			if plan, exists := DefaultPhoneDialPlan(normalized); exists {
 				meta := plan.toMetadata()
 				if meta.CountryCode != "" && len(meta.Groups) > 0 {
 					localBundle.Phone = meta
 				}
 			}
-			registry.RegisterTypedProvider(trimmed, newCLDRProvider(trimmed, localBundle))
+			registry.RegisterTypedProvider(normalized, newCLDRProvider(normalized, localBundle))
 		}
 	}
 }
