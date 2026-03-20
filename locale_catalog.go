@@ -260,9 +260,11 @@ func (c *LocaleCatalog) DecodeMetadata(locale string, out any) error {
 	if err != nil {
 		return fmt.Errorf("locale catalog: encode metadata for %q: %w", normalizedLocale, err)
 	}
-	if err := json.Unmarshal(raw, out); err != nil {
+	decoded := reflect.New(value.Elem().Type())
+	if err := json.Unmarshal(raw, decoded.Interface()); err != nil {
 		return fmt.Errorf("locale catalog: decode metadata for %q: %w", normalizedLocale, err)
 	}
+	value.Elem().Set(decoded.Elem())
 
 	return nil
 }
