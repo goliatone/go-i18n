@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"maps"
 	"sort"
 )
 
@@ -44,28 +45,50 @@ func NewStaticStore(data Translations) *StaticStore {
 	}
 
 	translations := make(Translations, len(data))
-	locales := make([]string, 0, len(data))
+	originalLocales := make([]string, 0, len(data))
+	for locale := range data {
+		originalLocales = append(originalLocales, locale)
+	}
+	sort.Strings(originalLocales)
 
-	for locale, catalog := range data {
+	for _, locale := range originalLocales {
+		catalog := data[locale]
 		if catalog == nil {
 			continue
 		}
+
+		normalizedLocale := NormalizeLocale(locale)
+		if code := NormalizeLocale(catalog.Locale.Code); code != "" {
+			normalizedLocale = code
+		}
+		if normalizedLocale == "" {
+			continue
+		}
+
 		clone := &TranslationCatalog{
 			Locale: catalog.Locale,
 		}
-		if clone.Locale.Code == "" {
-			clone.Locale.Code = locale
-		}
+		clone.Locale.Code = normalizedLocale
+		clone.Locale.Parent = NormalizeLocale(clone.Locale.Parent)
 
 		if len(catalog.Messages) > 0 {
 			clone.Messages = make(map[string]Message, len(catalog.Messages))
 			for key, message := range catalog.Messages {
+				message.Locale = NormalizeLocale(message.Locale)
+				if message.Locale == "" {
+					message.Locale = normalizedLocale
+				}
 				clone.Messages[key] = message.Clone()
 			}
 		}
 
 		if catalog.CardinalRules != nil {
 			clone.CardinalRules = catalog.CardinalRules.Clone()
+			clone.CardinalRules.Locale = NormalizeLocale(clone.CardinalRules.Locale)
+			if clone.CardinalRules.Locale == "" {
+				clone.CardinalRules.Locale = normalizedLocale
+			}
+			clone.CardinalRules.Parent = NormalizeLocale(clone.CardinalRules.Parent)
 			if clone.Locale.Name == "" {
 				clone.Locale.Name = clone.CardinalRules.DisplayName
 			}
@@ -74,11 +97,33 @@ func NewStaticStore(data Translations) *StaticStore {
 			}
 		}
 
-		translations[locale] = clone
-		locales = append(locales, locale)
+		existing := translations[normalizedLocale]
+		if existing == nil {
+			translations[normalizedLocale] = clone
+			continue
+		}
+
+		if len(clone.Messages) > 0 {
+			if existing.Messages == nil {
+				existing.Messages = make(map[string]Message, len(clone.Messages))
+			}
+			maps.Copy(existing.Messages, clone.Messages)
+		}
+		if clone.CardinalRules != nil {
+			existing.CardinalRules = clone.CardinalRules
+		}
+		if existing.Locale.Name == "" {
+			existing.Locale.Name = clone.Locale.Name
+		}
+		if existing.Locale.Parent == "" {
+			existing.Locale.Parent = clone.Locale.Parent
+		}
 	}
 
-	// make locales deterministic
+	locales := make([]string, 0, len(translations))
+	for locale := range translations {
+		locales = append(locales, locale)
+	}
 	sort.Strings(locales)
 
 	return &StaticStore{
@@ -106,7 +151,7 @@ func (s *StaticStore) Message(locale, key string) (Message, bool) {
 		return Message{}, false
 	}
 
-	catalog, ok := s.translations[locale]
+	catalog, ok := s.translations[NormalizeLocale(locale)]
 	if !ok || catalog == nil {
 		return Message{}, false
 	}
@@ -136,7 +181,7 @@ func (s *StaticStore) Rules(locale string) (*PluralRuleSet, bool) {
 	if s == nil {
 		return nil, false
 	}
-	catalog, ok := s.translations[locale]
+	catalog, ok := s.translations[NormalizeLocale(locale)]
 	if !ok || catalog == nil || catalog.CardinalRules == nil {
 		return nil, false
 	}
