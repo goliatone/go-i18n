@@ -169,6 +169,37 @@
       ],
       "header": "es-MX,fr;q=0.7",
       "matched_expectation": "es"
+    },
+    {
+      "name": "inactive-locale-participates-in-convenience-matching",
+      "catalog_locales": [
+        "en",
+        "fr"
+      ],
+      "inactive_locales": [
+        "fr"
+      ],
+      "header": "fr-CA,fr;q=0.9,en;q=0.8",
+      "matched_expectation": "fr",
+      "notes": [
+        "Convenience matching stays scoped to all configured locales by default."
+      ]
+    },
+    {
+      "name": "active-only-scope-filters-inactive-locales",
+      "catalog_locales": [
+        "en",
+        "fr"
+      ],
+      "inactive_locales": [
+        "fr"
+      ],
+      "scope": "active_only",
+      "header": "fr-CA,fr;q=0.9,en;q=0.8",
+      "matched_expectation": "en",
+      "notes": [
+        "Scoped Accept-Language matching can opt into active-only policy."
+      ]
     }
   ],
   "resolve_locale": [
