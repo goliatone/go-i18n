@@ -1,8 +1,12 @@
 package i18n
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
+
+	"golang.org/x/text/language"
 )
 
 // LocaleCatalog is an immutable snapshot of locale metadata loaded from culture data.
@@ -11,6 +15,8 @@ type LocaleCatalog struct {
 	locales       map[string]localeEntry
 	allCodes      []string
 	activeCodes   []string
+	allMatcher    localeMatchState
+	activeMatcher localeMatchState
 }
 
 type localeEntry struct {
@@ -18,6 +24,11 @@ type localeEntry struct {
 	active      bool
 	fallbacks   []string
 	metadata    map[string]any
+}
+
+type localeMatchState struct {
+	codes   []string
+	matcher language.Matcher
 }
 
 // LocaleMetadata exposes the immutable metadata for a single locale.
@@ -96,6 +107,8 @@ func newLocaleCatalog(defaultLocale string, definitions map[string]LocaleDefinit
 		locales:       locales,
 		allCodes:      allCodes,
 		activeCodes:   activeCodes,
+		allMatcher:    newLocaleMatchState(allCodes),
+		activeMatcher: newLocaleMatchState(activeCodes),
 	}, nil
 }
 
@@ -208,6 +221,179 @@ func (c *LocaleCatalog) Locale(locale string) (LocaleMetadata, bool) {
 		meta.Metadata = cloneMetadata(entry.metadata)
 	}
 	return meta, true
+}
+
+// Match resolves a requested locale to a supported catalog locale.
+// The default public behavior is exact-or-parent matching across all locales.
+func (c *LocaleCatalog) Match(locale string) (LocaleMetadata, bool) {
+	return c.matchWithOptions(locale, MatchExactOrParent, ScopeAll)
+}
+
+// MatchAcceptLanguage resolves an Accept-Language header to the best supported locale.
+func (c *LocaleCatalog) MatchAcceptLanguage(header string) (LocaleMetadata, bool) {
+	return c.matchAcceptLanguageWithOptions(header, ScopeAll)
+}
+
+// DecodeMetadata decodes locale metadata into a caller-owned output struct.
+func (c *LocaleCatalog) DecodeMetadata(locale string, out any) error {
+	if c == nil {
+		return fmt.Errorf("locale catalog: unavailable")
+	}
+	if out == nil {
+		return fmt.Errorf("locale catalog: output must be a non-nil pointer")
+	}
+	value := reflect.ValueOf(out)
+	if value.Kind() != reflect.Pointer || value.IsNil() {
+		return fmt.Errorf("locale catalog: output must be a non-nil pointer")
+	}
+
+	normalizedLocale := NormalizeLocale(locale)
+	metadata, ok := c.locales[normalizedLocale]
+	if !ok {
+		return fmt.Errorf("locale catalog: locale %q not found", normalizedLocale)
+	}
+	if len(metadata.metadata) == 0 {
+		return fmt.Errorf("locale catalog: locale %q has no metadata", normalizedLocale)
+	}
+
+	raw, err := json.Marshal(metadata.metadata)
+	if err != nil {
+		return fmt.Errorf("locale catalog: encode metadata for %q: %w", normalizedLocale, err)
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		return fmt.Errorf("locale catalog: decode metadata for %q: %w", normalizedLocale, err)
+	}
+
+	return nil
+}
+
+func (c *LocaleCatalog) matchWithOptions(locale string, strategy MatchStrategy, scope LocaleScope) (LocaleMetadata, bool) {
+	if c == nil {
+		return LocaleMetadata{}, false
+	}
+
+	normalized := NormalizeLocale(locale)
+	if normalized == "" {
+		return LocaleMetadata{}, false
+	}
+
+	if meta, ok := c.lookupScopeLocale(normalized, scope); ok {
+		return meta, true
+	}
+
+	switch strategy {
+	case MatchExact:
+		return LocaleMetadata{}, false
+	case MatchBestFit:
+		if meta, ok := c.matchBestFit(normalized, scope); ok {
+			return meta, true
+		}
+		fallthrough
+	case MatchExactOrParent:
+		for _, parent := range LocaleParentChain(normalized) {
+			if meta, ok := c.lookupScopeLocale(parent, scope); ok {
+				return meta, true
+			}
+		}
+	default:
+		return LocaleMetadata{}, false
+	}
+
+	return LocaleMetadata{}, false
+}
+
+func (c *LocaleCatalog) matchAcceptLanguageWithOptions(header string, scope LocaleScope) (LocaleMetadata, bool) {
+	if c == nil {
+		return LocaleMetadata{}, false
+	}
+
+	tags, _, err := language.ParseAcceptLanguage(header)
+	if err != nil || len(tags) == 0 {
+		return LocaleMetadata{}, false
+	}
+
+	state := c.matchState(scope)
+	if state.matcher == nil || len(state.codes) == 0 {
+		return LocaleMetadata{}, false
+	}
+
+	_, index, _ := state.matcher.Match(tags...)
+	if index < 0 || index >= len(state.codes) {
+		return LocaleMetadata{}, false
+	}
+
+	return c.Locale(state.codes[index])
+}
+
+func (c *LocaleCatalog) matchBestFit(locale string, scope LocaleScope) (LocaleMetadata, bool) {
+	state := c.matchState(scope)
+	if state.matcher == nil || len(state.codes) == 0 {
+		return LocaleMetadata{}, false
+	}
+
+	tag, err := language.Parse(locale)
+	if err != nil {
+		return LocaleMetadata{}, false
+	}
+
+	_, index, _ := state.matcher.Match(tag)
+	if index < 0 || index >= len(state.codes) {
+		return LocaleMetadata{}, false
+	}
+
+	return c.Locale(state.codes[index])
+}
+
+func (c *LocaleCatalog) lookupScopeLocale(locale string, scope LocaleScope) (LocaleMetadata, bool) {
+	if c == nil {
+		return LocaleMetadata{}, false
+	}
+
+	meta, ok := c.Locale(locale)
+	if !ok {
+		return LocaleMetadata{}, false
+	}
+	if scope == ScopeActiveOnly && !meta.Active {
+		return LocaleMetadata{}, false
+	}
+
+	return meta, true
+}
+
+func (c *LocaleCatalog) matchState(scope LocaleScope) localeMatchState {
+	if c == nil {
+		return localeMatchState{}
+	}
+	if scope == ScopeActiveOnly {
+		return c.activeMatcher
+	}
+	return c.allMatcher
+}
+
+func newLocaleMatchState(codes []string) localeMatchState {
+	if len(codes) == 0 {
+		return localeMatchState{}
+	}
+
+	tags := make([]language.Tag, 0, len(codes))
+	normalizedCodes := make([]string, 0, len(codes))
+	for _, code := range codes {
+		tag, err := language.Parse(code)
+		if err != nil {
+			continue
+		}
+		tags = append(tags, tag)
+		normalizedCodes = append(normalizedCodes, code)
+	}
+
+	if len(tags) == 0 {
+		return localeMatchState{}
+	}
+
+	return localeMatchState{
+		codes:   normalizedCodes,
+		matcher: language.NewMatcher(tags),
+	}
 }
 
 func sanitizeFallbacks(locale string, fallbacks []string) []string {
