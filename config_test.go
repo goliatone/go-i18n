@@ -20,7 +20,7 @@ func TestNewConfigDefaults(t *testing.T) {
 		t.Fatalf("DefaultLocale = %q", cfg.DefaultLocale)
 	}
 
-	expected := []string{"en", "es"}
+	expected := []string{"es", "en"}
 	if len(cfg.Locales) != len(expected) {
 		t.Fatalf("Locales length = %d, want %d", len(cfg.Locales), len(expected))
 	}
