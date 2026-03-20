@@ -232,9 +232,27 @@ func cloneMetadata(input map[string]any) map[string]any {
 	}
 	out := make(map[string]any, len(input))
 	for key, value := range input {
-		out[key] = value
+		out[key] = cloneMetadataValue(value)
 	}
 	return out
+}
+
+func cloneMetadataValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneMetadata(typed)
+	case []any:
+		if len(typed) == 0 {
+			return []any{}
+		}
+		out := make([]any, len(typed))
+		for i, entry := range typed {
+			out[i] = cloneMetadataValue(entry)
+		}
+		return out
+	default:
+		return typed
+	}
 }
 
 func cloneBool(value *bool) *bool {
