@@ -6,6 +6,12 @@ The `examples` directory hosts runnable snippets that demonstrate how the `i18n`
 
 - `basic`: loads file-based translations, builds a translator through `Config`, wires template helpers, and shows how to override formatters.
 
+The package also exposes shared locale-policy helpers for non-template consumers:
+
+- `NormalizeLocale` and `NormalizeLocales` for canonical request handling
+- `LocaleCatalog.Match` and `MatchAcceptLanguage` for supported-locale selection
+- `ResolveLocale` for explicit locale-chain planning
+
 ## Running the demo
 
 Use the provided command entrypoint:

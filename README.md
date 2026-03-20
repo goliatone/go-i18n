@@ -34,6 +34,52 @@ The `Formatter` interface formats translation templates with arguments. Default 
 
 The `FallbackResolver` interface returns fallback locale chains. When a translation is missing in the requested locale, the translator checks each fallback in order.
 
+## Shared Locale Policy
+
+`go-i18n` now exposes a shared locale-policy surface for callers that need canonical locale handling outside the translator.
+
+Core helpers:
+
+- `NormalizeLocale(locale)`
+- `NormalizeLocales(locales)`
+- `NormalizeAndSortLocales(locales)`
+- `LocaleParent(locale)`
+- `LocaleParentChain(locale)`
+
+Catalog helpers:
+
+- `LocaleCatalog.Match(locale)` resolves a requested locale against the configured catalog using exact-or-parent matching across all locales.
+- `LocaleCatalog.MatchAcceptLanguage(header)` resolves an `Accept-Language` header against the configured catalog.
+- `LocaleCatalog.DecodeMetadata(locale, out)` decodes generic locale metadata into a caller-owned struct.
+
+Resolution helper:
+
+- `ResolveLocale(locale, ResolveLocaleOptions)` builds a deterministic locale chain for routing, cache keys, and request planning.
+
+Conservative defaults matter here:
+
+- `ResolveLocale` defaults to exact matching.
+- It does not expand parents unless `ExpandParents` is set.
+- It does not expand fallbacks unless `ExpandFallbacks` is set.
+- It does not append the default locale unless `IncludeDefault` is set.
+
+That public API is intentionally narrower than translator lookup. `SimpleTranslator` still uses its runtime lookup order for translation retrieval, but that behavior is not the default shared locale-policy contract for other consumers.
+
+```go
+normalized := i18n.NormalizeLocale(" ES_mx ")
+locales := i18n.NormalizeLocales([]string{"es_mx", "es", "ES-MX"})
+
+catalog := cfg.LocaleCatalog()
+matched, _ := catalog.MatchAcceptLanguage("es-MX,es;q=0.9,en;q=0.8")
+
+resolution := i18n.ResolveLocale("es-MX", i18n.ResolveLocaleOptions{
+    Catalog:       catalog,
+    Resolver:      cfg.Resolver,
+    MatchStrategy: i18n.MatchExact,
+    ExpandParents: true,
+})
+```
+
 ## Basic Usage
 
 ```go
@@ -323,6 +369,8 @@ Custom formatting rules automatically integrate with the formatter registry and 
 - `WithTranslatorHooks(...hooks)` - Add translation hooks
 - `WithCultureData(path)` - Load culture data and formatting rules from JSON file
 - `WithCultureOverride(locale, path)` - Add locale-specific culture data override
+
+See [`docs/locale_policy_v1.md`](docs/locale_policy_v1.md) for locale-policy migration notes and release details.
 
 ## Error Handling
 
