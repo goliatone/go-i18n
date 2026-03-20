@@ -1,0 +1,351 @@
+{
+  "phase": 0,
+  "description": "Locked behavior matrix for shared locale-policy API implementation.",
+  "normalization": [
+    {
+      "name": "trim-and-underscore-normalization",
+      "input": " en_US ",
+      "canonical_expectation": "en-US",
+      "notes": [
+        "Trim surrounding whitespace.",
+        "Replace underscore with hyphen.",
+        "Canonicalize using x/text when possible."
+      ]
+    },
+    {
+      "name": "mixed-case-normalization",
+      "input": "ES-mx",
+      "canonical_expectation": "es-MX",
+      "notes": [
+        "Canonical output should use deterministic BCP 47 casing."
+      ]
+    },
+    {
+      "name": "empty-normalization",
+      "input": "   ",
+      "canonical_expectation": "",
+      "notes": [
+        "Empty after trimming stays empty."
+      ]
+    },
+    {
+      "name": "invalid-tag-fallback",
+      "input": "bad_locale_value",
+      "canonical_expectation": "bad-locale-value",
+      "notes": [
+        "Must not panic on invalid input.",
+        "Conservative normalized fallback is allowed when full canonicalization fails."
+      ]
+    }
+  ],
+  "normalize_locales": [
+    {
+      "name": "dedupe-after-normalization-stable-first-seen",
+      "input": [
+        "en_US",
+        "es",
+        "en-US",
+        " ES ",
+        " EN-us "
+      ],
+      "canonical_expectation": [
+        "en-US",
+        "es"
+      ],
+      "notes": [
+        "Deduplicate after canonical normalization.",
+        "Preserve stable first-seen order."
+      ]
+    }
+  ],
+  "normalize_and_sort_locales": [
+    {
+      "name": "dedupe-after-normalization-and-sort",
+      "input": [
+        "en_US",
+        "es",
+        "en-US",
+        " ES ",
+        " EN-us "
+      ],
+      "canonical_expectation": [
+        "en-US",
+        "es"
+      ],
+      "sorted_expectation": [
+        "en-US",
+        "es"
+      ],
+      "notes": [
+        "Deduplicate after canonical normalization.",
+        "Sort deterministically for set-like consumers such as cache-key generation."
+      ]
+    }
+  ],
+  "parent_chain": [
+    {
+      "name": "regional-parent-chain",
+      "input": "es-MX",
+      "parent_expectation": "es",
+      "chain_expectation": [
+        "es"
+      ]
+    },
+    {
+      "name": "root-locale-parent-chain",
+      "input": "en",
+      "parent_expectation": "",
+      "chain_expectation": []
+    }
+  ],
+  "catalog_match": [
+    {
+      "name": "exact-match",
+      "catalog_locales": [
+        "en",
+        "es",
+        "es-MX"
+      ],
+      "scope": "all",
+      "strategy": "exact",
+      "input": "es-MX",
+      "matched_expectation": "es-MX"
+    },
+    {
+      "name": "exact-or-parent-match",
+      "catalog_locales": [
+        "en",
+        "es"
+      ],
+      "scope": "all",
+      "strategy": "exact_or_parent",
+      "input": "es-MX",
+      "matched_expectation": "es"
+    },
+    {
+      "name": "inactive-locale-excluded-when-scoped",
+      "catalog_locales": [
+        "en",
+        "fr"
+      ],
+      "inactive_locales": [
+        "fr"
+      ],
+      "scope": "active_only",
+      "strategy": "exact",
+      "input": "fr",
+      "matched_expectation": "",
+      "notes": [
+        "Active-only filtering is explicit policy."
+      ]
+    }
+  ],
+  "accept_language": [
+    {
+      "name": "weighted-best-fit",
+      "catalog_locales": [
+        "en",
+        "es",
+        "es-MX"
+      ],
+      "header": "es-MX,es;q=0.9,en;q=0.8",
+      "matched_expectation": "es-MX"
+    },
+    {
+      "name": "fallback-to-supported-parent",
+      "catalog_locales": [
+        "en",
+        "es"
+      ],
+      "header": "es-MX,fr;q=0.7",
+      "matched_expectation": "es"
+    }
+  ],
+  "resolve_locale": [
+    {
+      "name": "conservative-defaults",
+      "input": "es-MX",
+      "catalog_locales": [
+        "en",
+        "es",
+        "es-MX"
+      ],
+      "options": {
+        "strategy": "exact",
+        "scope": "all",
+        "expand_parents": false,
+        "expand_fallbacks": false,
+        "include_default": false
+      },
+      "expected": {
+        "canonical": "es-MX",
+        "matched": "es-MX",
+        "parents": [
+          "es"
+        ],
+        "fallbacks": [],
+        "default": "",
+        "chain": [
+          "es-MX"
+        ]
+      }
+    },
+    {
+      "name": "explicit-parent-expansion",
+      "input": "es-MX",
+      "catalog_locales": [
+        "en",
+        "es",
+        "es-MX"
+      ],
+      "options": {
+        "strategy": "exact",
+        "scope": "all",
+        "expand_parents": true,
+        "expand_fallbacks": false,
+        "include_default": false
+      },
+      "expected": {
+        "canonical": "es-MX",
+        "matched": "es-MX",
+        "parents": [
+          "es"
+        ],
+        "fallbacks": [],
+        "default": "",
+        "chain": [
+          "es-MX",
+          "es"
+        ]
+      }
+    },
+    {
+      "name": "explicit-fallback-expansion",
+      "input": "fr-CA",
+      "catalog_locales": [
+        "en",
+        "fr",
+        "fr-CA"
+      ],
+      "resolver_fallbacks": {
+        "fr-CA": [
+          "fr",
+          "en"
+        ]
+      },
+      "options": {
+        "strategy": "exact",
+        "scope": "all",
+        "expand_parents": false,
+        "expand_fallbacks": true,
+        "include_default": false
+      },
+      "expected": {
+        "canonical": "fr-CA",
+        "matched": "fr-CA",
+        "parents": [
+          "fr"
+        ],
+        "fallbacks": [
+          "fr",
+          "en"
+        ],
+        "default": "",
+        "chain": [
+          "fr-CA",
+          "fr",
+          "en"
+        ]
+      }
+    },
+    {
+      "name": "explicit-default-inclusion",
+      "input": "pt-BR",
+      "catalog_locales": [
+        "en",
+        "pt-BR"
+      ],
+      "options": {
+        "strategy": "exact",
+        "scope": "all",
+        "expand_parents": false,
+        "expand_fallbacks": false,
+        "include_default": true,
+        "default_locale": "en"
+      },
+      "expected": {
+        "canonical": "pt-BR",
+        "matched": "pt-BR",
+        "parents": [
+          "pt"
+        ],
+        "fallbacks": [],
+        "default": "en",
+        "chain": [
+          "pt-BR",
+          "en"
+        ]
+      }
+    },
+    {
+      "name": "dedupe-across-expansions",
+      "input": "fr-CA",
+      "catalog_locales": [
+        "en",
+        "fr",
+        "fr-CA"
+      ],
+      "resolver_fallbacks": {
+        "fr-CA": [
+          "fr",
+          "en",
+          "fr"
+        ]
+      },
+      "options": {
+        "strategy": "exact",
+        "scope": "all",
+        "expand_parents": true,
+        "expand_fallbacks": true,
+        "include_default": true,
+        "default_locale": "en"
+      },
+      "expected": {
+        "canonical": "fr-CA",
+        "matched": "fr-CA",
+        "parents": [
+          "fr"
+        ],
+        "fallbacks": [
+          "fr",
+          "en"
+        ],
+        "default": "en",
+        "chain": [
+          "fr-CA",
+          "fr",
+          "en"
+        ]
+      },
+      "notes": [
+        "Final chain must be ordered and deduplicated."
+      ]
+    }
+  ],
+  "metadata_decode": [
+    {
+      "name": "generic-consumer-owned-decode",
+      "locale": "es-MX",
+      "metadata": {
+        "search_enabled": true,
+        "analyzer": "spanish",
+        "semantic_model": "multilingual-v1"
+      },
+      "consumer_type": "LocaleSearchMetadata",
+      "notes": [
+        "Typed metadata structs remain consumer-owned.",
+        "go-i18n exposes a generic DecodeMetadata seam only."
+      ]
+    }
+  ]
+}
