@@ -96,9 +96,7 @@ func mergeCultureDataInto(dest, source *CultureData) {
 		if dest.Currencies == nil {
 			dest.Currencies = make(map[string]CurrencyInfo, len(source.Currencies))
 		}
-		for locale, info := range source.Currencies {
-			dest.Currencies[locale] = info
-		}
+		maps.Copy(dest.Currencies, source.Currencies)
 	}
 
 	if source.SupportNumbers != nil {
@@ -189,9 +187,7 @@ func mergeLocaleDefinition(base, override LocaleDefinition) LocaleDefinition {
 		if result.Metadata == nil {
 			result.Metadata = make(map[string]any, len(override.Metadata))
 		}
-		for key, value := range override.Metadata {
-			result.Metadata[key] = value
-		}
+		maps.Copy(result.Metadata, override.Metadata)
 	}
 
 	return result
@@ -291,9 +287,7 @@ func cloneUnitPreference(pref UnitPreference) UnitPreference {
 	}
 	if len(pref.ConversionFrom) > 0 {
 		out.ConversionFrom = make(map[string]float64, len(pref.ConversionFrom))
-		for unit, factor := range pref.ConversionFrom {
-			out.ConversionFrom[unit] = factor
-		}
+		maps.Copy(out.ConversionFrom, pref.ConversionFrom)
 	}
 	return out
 }
