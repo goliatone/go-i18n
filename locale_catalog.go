@@ -229,9 +229,16 @@ func (c *LocaleCatalog) Match(locale string) (LocaleMetadata, bool) {
 	return c.matchWithOptions(locale, MatchExactOrParent, ScopeAll)
 }
 
-// MatchAcceptLanguage resolves an Accept-Language header to the best supported locale.
+// MatchAcceptLanguage resolves an Accept-Language header to the best supported locale
+// across all configured locales.
 func (c *LocaleCatalog) MatchAcceptLanguage(header string) (LocaleMetadata, bool) {
 	return c.matchAcceptLanguageWithOptions(header, ScopeAll)
+}
+
+// MatchAcceptLanguageWithOptions resolves an Accept-Language header to the best
+// supported locale using explicit matching scope controls.
+func (c *LocaleCatalog) MatchAcceptLanguageWithOptions(header string, opts MatchOptions) (LocaleMetadata, bool) {
+	return c.matchAcceptLanguageWithOptions(header, opts.Scope)
 }
 
 // DecodeMetadata decodes locale metadata into a caller-owned output struct.
