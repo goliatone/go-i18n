@@ -1,5 +1,7 @@
 package i18n
 
+import "maps"
+
 import "fmt"
 
 // Config captures translator and formatter setup
@@ -294,9 +296,7 @@ func (cfg *Config) TemplateHelpers(t Translator, helperCfg HelperConfig) map[str
 	cultureService := cfg.CultureService()
 	if cultureService != nil {
 		cultureHelpers := CultureHelpers(cultureService, helperCfg.LocaleKey)
-		for name, fn := range cultureHelpers {
-			result[name] = fn
-		}
+		maps.Copy(result, cultureHelpers)
 	}
 
 	return result
