@@ -160,7 +160,7 @@ func ensureLocaleFallback(registry *FormatterRegistry, locale string) {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 
-	if len(resolver.Resolve(locale)) > 0 {
+	if resolver.Has(locale) {
 		return
 	}
 
