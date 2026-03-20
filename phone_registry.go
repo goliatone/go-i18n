@@ -22,8 +22,8 @@ type PhoneFormatterFunc func(locale, raw string) string
 // RegisterPhoneFormatter registers a custom phone formatter for the given locale.
 // The formatter receives the resolved locale and raw input string.
 func RegisterPhoneFormatter(locale string, formatter PhoneFormatterFunc) {
-	trimmedLocale := strings.TrimSpace(locale)
-	if trimmedLocale == "" || formatter == nil {
+	normalizedLocale := NormalizeLocale(locale)
+	if normalizedLocale == "" || formatter == nil {
 		return
 	}
 
@@ -32,9 +32,9 @@ func RegisterPhoneFormatter(locale string, formatter PhoneFormatterFunc) {
 		return
 	}
 
-	registry.RegisterLocale(trimmedLocale, "format_phone", func(loc, raw string) string {
+	registry.RegisterLocale(normalizedLocale, "format_phone", func(loc, raw string) string {
 		if loc == "" {
-			loc = trimmedLocale
+			loc = normalizedLocale
 		}
 		return formatter(loc, raw)
 	})
@@ -56,7 +56,7 @@ func RegisterPhoneDialPlan(locale string, plan PhoneDialPlan) {
 // DefaultPhoneDialPlan exposes the built-in dial plan for a locale if available.
 // It first checks the exact locale key, then falls back to the base language.
 func DefaultPhoneDialPlan(locale string) (PhoneDialPlan, bool) {
-	key := normalizeLocaleKey(locale)
+	key := NormalizeLocale(locale)
 	if plan, ok := defaultPhoneDialPlans[key]; ok {
 		return plan, true
 	}
@@ -92,12 +92,4 @@ func normalizePhoneGroups(groups []int) []int {
 		}
 	}
 	return result
-}
-
-func normalizeLocaleKey(locale string) string {
-	if locale == "" {
-		return ""
-	}
-	normalized := strings.ReplaceAll(locale, "_", "-")
-	return strings.ToLower(normalized)
 }
