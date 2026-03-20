@@ -3,6 +3,7 @@ package i18n
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -63,7 +64,6 @@ func TestFormatterContractFixture(t *testing.T) {
 	}
 
 	for _, locale := range fixture.Locales {
-		locale := locale
 		t.Run(locale.Locale, func(t *testing.T) {
 			verifyFormatterContract(t, registry, fixture, locale, moment)
 		})
@@ -251,9 +251,7 @@ func (p *fixtureProvider) Formatter(name string) (any, bool) {
 
 func (p *fixtureProvider) FuncMap() map[string]any {
 	cloned := make(map[string]any, len(p.funcs))
-	for key, value := range p.funcs {
-		cloned[key] = value
-	}
+	maps.Copy(cloned, p.funcs)
 	return cloned
 }
 

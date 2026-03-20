@@ -119,7 +119,6 @@ func TestFormatPhone(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if got := FormatPhone(tc.locale, tc.input); got != tc.want {
 				t.Fatalf("FormatPhone(%s, %s) = %q, want %q", tc.locale, tc.input, got, tc.want)

@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"strings"
 	"testing"
@@ -241,9 +242,7 @@ func (p *stubTypedProvider) Formatter(name string) (any, bool) {
 
 func (p *stubTypedProvider) FuncMap() map[string]any {
 	result := make(map[string]any, len(p.funcs))
-	for key, value := range p.funcs {
-		result[key] = value
-	}
+	maps.Copy(result, p.funcs)
 	return result
 }
 
