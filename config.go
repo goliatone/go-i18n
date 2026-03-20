@@ -83,7 +83,7 @@ func NewConfig(opts ...Option) (*Config, error) {
 // WithDefaultLocale sets the default locale in Config
 func WithDefaultLocale(locale string) Option {
 	return func(c *Config) error {
-		c.DefaultLocale = locale
+		c.DefaultLocale = NormalizeLocale(locale)
 		return nil
 	}
 }
@@ -156,6 +156,7 @@ func WithFormatterLocales(locales ...string) Option {
 
 func WithFormatterProvider(locale string, provider FormatterProvider) Option {
 	return func(c *Config) error {
+		locale = NormalizeLocale(locale)
 		if locale == "" || provider == nil {
 			return nil
 		}
@@ -318,13 +319,13 @@ func (cfg *Config) applyLocaleCatalog() error {
 	cfg.localeCatalog = catalog
 
 	if catalog == nil {
-		cfg.DefaultLocale = normalizeLocale(cfg.DefaultLocale)
+		cfg.DefaultLocale = NormalizeLocale(cfg.DefaultLocale)
 		return nil
 	}
 
 	if len(cfg.Locales) > 0 {
 		for i, locale := range cfg.Locales {
-			cfg.Locales[i] = normalizeLocale(locale)
+			cfg.Locales[i] = NormalizeLocale(locale)
 		}
 		for _, locale := range cfg.Locales {
 			if !catalog.Has(locale) {
@@ -336,7 +337,7 @@ func (cfg *Config) applyLocaleCatalog() error {
 	}
 
 	if cfg.DefaultLocale != "" {
-		cfg.DefaultLocale = normalizeLocale(cfg.DefaultLocale)
+		cfg.DefaultLocale = NormalizeLocale(cfg.DefaultLocale)
 		if !catalog.Has(cfg.DefaultLocale) {
 			return fmt.Errorf("i18n: default locale %q is not defined in culture data", cfg.DefaultLocale)
 		}
@@ -469,6 +470,7 @@ func (cfg *Config) ensureFormatterRegistry() {
 
 	if len(cfg.formatterProviders) > 0 {
 		for locale, provider := range cfg.formatterProviders {
+			locale = NormalizeLocale(locale)
 			if locale == "" || provider == nil {
 				continue
 			}
