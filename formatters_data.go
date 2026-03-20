@@ -16,13 +16,21 @@ func NewFormattingRulesProvider(cultureData *CultureData, resolver FallbackResol
 
 	// Start with hardcoded defaults as ultimate fallback
 	for k, v := range formattingRulesData {
-		rules[k] = v
+		rules[NormalizeLocale(k)] = v
 	}
 
 	// Override with culture data if provided
 	if cultureData != nil && cultureData.FormattingRules != nil {
 		for k, v := range cultureData.FormattingRules {
-			rules[k] = v
+			normalized := NormalizeLocale(k)
+			if normalized == "" {
+				continue
+			}
+			v.Locale = NormalizeLocale(v.Locale)
+			if v.Locale == "" {
+				v.Locale = normalized
+			}
+			rules[normalized] = v
 		}
 	}
 
@@ -35,6 +43,7 @@ func NewFormattingRulesProvider(cultureData *CultureData, resolver FallbackResol
 // Get loads formatting rules for a locale
 // It tries exact match, then base language, then falls back to English
 func (p *FormattingRulesProvider) Get(locale string) *FormattingRules {
+	locale = NormalizeLocale(locale)
 	if p == nil || p.rules == nil {
 		// Ultimate fallback: use hardcoded English
 		rules := formattingRulesData["en"]
@@ -76,6 +85,7 @@ func (p *FormattingRulesProvider) Get(locale string) *FormattingRules {
 // loadFormattingRules loads formatting rules for a locale (deprecated, use FormattingRulesProvider)
 // It tries exact match, then base language, then falls back to English
 func loadFormattingRules(locale string) *FormattingRules {
+	locale = NormalizeLocale(locale)
 	// Try exact match
 	if rules, ok := formattingRulesData[locale]; ok {
 		return &rules
