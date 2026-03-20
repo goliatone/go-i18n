@@ -178,6 +178,7 @@ func (s *cultureService) GetMeasurementPreference(locale, measurementType string
 }
 
 func (s *cultureService) collectLocaleChain(locale string, seen map[string]struct{}) []string {
+	locale = NormalizeLocale(locale)
 	if locale == "" {
 		return nil
 	}
@@ -250,6 +251,7 @@ func (s *cultureService) ConvertMeasurement(locale string, value float64, fromUn
 
 // resolveCandidates returns the list of locale candidates to try
 func (s *cultureService) resolveCandidates(locale string) []string {
+	locale = NormalizeLocale(locale)
 	if locale == "" {
 		return nil
 	}
@@ -258,6 +260,7 @@ func (s *cultureService) resolveCandidates(locale string) []string {
 	candidates := make([]string, 0, 4)
 
 	appendLocale := func(value string) {
+		value = NormalizeLocale(value)
 		if value == "" {
 			return
 		}
