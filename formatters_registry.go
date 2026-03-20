@@ -207,6 +207,7 @@ func WithFormatterRegistryLocales(locales ...string) FormatterRegistryOption {
 
 func WithFormatterRegistryTypedProvider(locale string, provider TypedFormatterProvider) FormatterRegistryOption {
 	return func(frc *formatterRegistryConfig) {
+		locale = NormalizeLocale(locale)
 		if locale == "" || provider == nil {
 			return
 		}
@@ -219,6 +220,7 @@ func WithFormatterRegistryTypedProvider(locale string, provider TypedFormatterPr
 
 func WithFormatterRegistryProvider(locale string, provider FormatterProvider) FormatterRegistryOption {
 	return func(frc *formatterRegistryConfig) {
+		locale = NormalizeLocale(locale)
 		if locale == "" || provider == nil {
 			return
 		}
@@ -331,6 +333,7 @@ func (r *FormatterRegistry) Register(name string, fn any) {
 
 // RegisterLocale registers a locale specific ovveride for the <name> helper
 func (r *FormatterRegistry) RegisterLocale(locale, name string, fn any) {
+	locale = NormalizeLocale(locale)
 	if locale == "" || name == "" || fn == nil {
 		return
 	}
@@ -353,6 +356,7 @@ func (r *FormatterRegistry) RegisterLocale(locale, name string, fn any) {
 }
 
 func (r *FormatterRegistry) RegisterProvider(locale string, provider FormatterProvider) {
+	locale = NormalizeLocale(locale)
 	if locale == "" || provider == nil {
 		return
 	}
@@ -369,6 +373,7 @@ func (r *FormatterRegistry) RegisterProvider(locale string, provider FormatterPr
 }
 
 func (r *FormatterRegistry) RegisterTypedProvider(locale string, provider TypedFormatterProvider) {
+	locale = NormalizeLocale(locale)
 	if locale == "" || provider == nil {
 		return
 	}
@@ -432,7 +437,7 @@ func (r *FormatterRegistry) FuncMap(locale string) map[string]any {
 }
 
 func (r *FormatterRegistry) funcMapForLocale(locale string) map[string]any {
-	key := locale
+	key := NormalizeLocale(locale)
 
 	r.mu.RLock()
 	if r.funcCache != nil {
@@ -452,7 +457,7 @@ func (r *FormatterRegistry) funcMapForLocale(locale string) map[string]any {
 		return cached
 	}
 
-	effective := locale
+	effective := key
 	if effective == "" {
 		effective = r.defaultLocale()
 	}
@@ -508,6 +513,7 @@ func (r *FormatterRegistry) invalidateFuncCacheLocked() {
 }
 
 func (r *FormatterRegistry) candidateLocales(locale string) []string {
+	locale = NormalizeLocale(locale)
 	if locale == "" {
 		return nil
 	}
