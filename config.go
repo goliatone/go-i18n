@@ -379,7 +379,7 @@ func (cfg *Config) applyCatalogFallbacks(catalog *LocaleCatalog) {
 	}
 
 	for _, locale := range catalog.AllLocaleCodes() {
-		if chain := resolver.Resolve(locale); len(chain) > 0 {
+		if resolver.Has(locale) {
 			continue
 		}
 		fallbacks := catalog.Fallbacks(locale)
@@ -428,7 +428,7 @@ func (cfg *Config) seedResolverFallbacks() {
 		if locale == "" {
 			continue
 		}
-		if existing := resolver.Resolve(locale); existing != nil {
+		if resolver.Has(locale) {
 			continue
 		}
 		chain := localeParentChain(locale)
