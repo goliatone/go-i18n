@@ -21,7 +21,8 @@ func NewStaticFallbackResolver() *StaticFallbackResolver {
 
 // Set registers the fallback chain for a locale
 func (r *StaticFallbackResolver) Set(locale string, fallbacks ...string) {
-	if r == nil || locale == "" {
+	normalizedLocale := NormalizeLocale(locale)
+	if r == nil || normalizedLocale == "" {
 		return
 	}
 
@@ -33,20 +34,21 @@ func (r *StaticFallbackResolver) Set(locale string, fallbacks ...string) {
 	}
 
 	seen := make(map[string]struct{}, len(fallbacks)+1)
-	seen[locale] = struct{}{}
+	seen[normalizedLocale] = struct{}{}
 	chain := make([]string, 0, len(fallbacks))
 
 	for _, fb := range fallbacks {
-		if fb == "" {
+		normalizedFallback := NormalizeLocale(fb)
+		if normalizedFallback == "" {
 			continue
 		}
-		if _, ok := seen[fb]; ok {
+		if _, ok := seen[normalizedFallback]; ok {
 			continue
 		}
-		seen[fb] = struct{}{}
-		chain = append(chain, fb)
+		seen[normalizedFallback] = struct{}{}
+		chain = append(chain, normalizedFallback)
 	}
-	r.chains[locale] = chain
+	r.chains[normalizedLocale] = chain
 }
 
 // Resolve returns a copy of the fallback chain for a locale
@@ -55,8 +57,13 @@ func (r *StaticFallbackResolver) Resolve(locale string) []string {
 		return nil
 	}
 
+	normalizedLocale := NormalizeLocale(locale)
+	if normalizedLocale == "" {
+		return nil
+	}
+
 	r.mu.RLock()
-	chain := r.chains[locale]
+	chain := r.chains[normalizedLocale]
 	r.mu.RUnlock()
 
 	if len(chain) == 0 {
