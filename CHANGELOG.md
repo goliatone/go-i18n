@@ -1,5 +1,37 @@
 # Changelog
 
+# [0.3.0](https://github.com/goliatone/go-i18n/compare/v0.2.0...v0.3.0) - (2026-03-20)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Normalize code in storage loop ([40bf1cd](https://github.com/goliatone/go-i18n/commit/40bf1cd2b61d27b7dca914ca467c0563c2d31eb0))  - (goliatone)
+- Normalzied locale and locale fallback ([611fee9](https://github.com/goliatone/go-i18n/commit/611fee95537efe711001fc0574961048277b513b))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.3.0 ([ef59ce3](https://github.com/goliatone/go-i18n/commit/ef59ce3cfd37f5070b2478a8b0465e52586cb461))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Match options ([8a6d011](https://github.com/goliatone/go-i18n/commit/8a6d0115c76c5d02bc21c4504da8ccf29a470719))  - (goliatone)
+- MatchAccepLanguageWithOptions ([26cd9c1](https://github.com/goliatone/go-i18n/commit/26cd9c1a1d25bf99297f9454c186fff34138b62f))  - (goliatone)
+- Decode metadata use interface unmarshall ([978c853](https://github.com/goliatone/go-i18n/commit/978c8536240fea892bcb2555ffcacf6bef34282b))  - (goliatone)
+- Espose Has locale to resolver ([415870f](https://github.com/goliatone/go-i18n/commit/415870f33806493e24467ced5e6fc242fa7d931a))  - (goliatone)
+- Normalize locale ([14cd4dc](https://github.com/goliatone/go-i18n/commit/14cd4dcee5cb8bf5a69d735cf3dba0e32c1e4780))  - (goliatone)
+- MatchAcceptLangauge to catalog ([74ba4e0](https://github.com/goliatone/go-i18n/commit/74ba4e0d8d831291667e593c7e79e998dcb2367f))  - (goliatone)
+- Clone metadata ([0d1c3e6](https://github.com/goliatone/go-i18n/commit/0d1c3e6688fd8804b69267e042b29d10287b0533))  - (goliatone)
+- Locale policy ([cf6a67f](https://github.com/goliatone/go-i18n/commit/cf6a67fc31b84818dcc11681e3e1dc28e527f18d))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.2.0 ([315a73a](https://github.com/goliatone/go-i18n/commit/315a73a0f5ba172319306f585a69ce2df6e47d8d))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update tests ([5ff8acc](https://github.com/goliatone/go-i18n/commit/5ff8acc9a4ab54e3ee32de24bc42e2aefb6a901a))  - (goliatone)
+- Update docs ([4ddecf1](https://github.com/goliatone/go-i18n/commit/4ddecf1487ddf605e9974ca816020a913cc25484))  - (goliatone)
+- Fix code ([1aff997](https://github.com/goliatone/go-i18n/commit/1aff99755fdcdd0e0e4c64d8c6470460406b9068))  - (goliatone)
+
 # [0.2.0](https://github.com/goliatone/go-i18n/compare/v0.1.0...v0.2.0) - (2025-10-27)
 
 ## <!-- 1 -->🐛 Bug Fixes
