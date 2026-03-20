@@ -19,12 +19,12 @@ func RegisterXTextFormatters(registry *FormatterRegistry, rulesProvider *Formatt
 	}
 
 	for _, locale := range locales {
-		trimmed := strings.TrimSpace(locale)
-		if trimmed == "" {
+		normalized := NormalizeLocale(locale)
+		if normalized == "" {
 			continue
 		}
 
-		registry.RegisterTypedProvider(trimmed, newXTextProvider(trimmed, rulesProvider))
+		registry.RegisterTypedProvider(normalized, newXTextProvider(normalized, rulesProvider))
 	}
 }
 
