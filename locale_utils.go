@@ -7,71 +7,25 @@ import (
 	"golang.org/x/text/language"
 )
 
-func localeParentTag(locale string) string {
-	if locale == "" {
+// NormalizeLocale canonicalizes a locale identifier for shared use across the package.
+func NormalizeLocale(locale string) string {
+	cleaned := strings.ReplaceAll(strings.TrimSpace(locale), "_", "-")
+	if cleaned == "" {
 		return ""
 	}
 
-	tag, err := language.Parse(locale)
-	if err == nil {
-		parent := tag.Parent()
-		if parent == language.Und {
-			return ""
+	if tag, err := language.Parse(cleaned); err == nil {
+		value := tag.String()
+		if value != "" && value != "und" {
+			return value
 		}
-		value := parent.String()
-		if value == "" || value == "und" {
-			return ""
-		}
-		return value
 	}
 
-	if idx := strings.LastIndex(locale, "-"); idx > 0 {
-		return locale[:idx]
-	}
-
-	return ""
+	return strings.ToLower(cleaned)
 }
 
-func localeParentChain(locale string) []string {
-	if locale == "" {
-		return nil
-	}
-
-	var chain []string
-	seen := make(map[string]struct{}, 4)
-
-	if tag, err := language.Parse(locale); err == nil {
-		for parent := tag.Parent(); parent != language.Und; parent = parent.Parent() {
-			parentValue := parent.String()
-			if parentValue == "" || parentValue == "und" {
-				break
-			}
-			if _, exists := seen[parentValue]; exists {
-				break
-			}
-			seen[parentValue] = struct{}{}
-			chain = append(chain, parentValue)
-		}
-	}
-
-	for current := localeParentTag(locale); current != ""; current = localeParentTag(current) {
-		if _, exists := seen[current]; exists {
-			continue
-		}
-		seen[current] = struct{}{}
-		chain = append(chain, current)
-	}
-
-	return chain
-}
-
-// normalizeLocale normalizes a single locale identifier by replacing
-// underscores with hyphens and trimming whitespace.
-func normalizeLocale(locale string) string {
-	return strings.ReplaceAll(strings.TrimSpace(locale), "_", "-")
-}
-
-func normalizeLocales(locales []string) []string {
+// NormalizeLocales canonicalizes, deduplicates, and preserves first-seen order.
+func NormalizeLocales(locales []string) []string {
 	if len(locales) == 0 {
 		return nil
 	}
@@ -79,7 +33,7 @@ func normalizeLocales(locales []string) []string {
 	seen := make(map[string]struct{}, len(locales))
 	result := make([]string, 0, len(locales))
 	for _, locale := range locales {
-		normalized := normalizeLocale(locale)
+		normalized := NormalizeLocale(locale)
 		if normalized == "" {
 			continue
 		}
@@ -90,8 +44,82 @@ func normalizeLocales(locales []string) []string {
 		result = append(result, normalized)
 	}
 
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
+}
+
+// NormalizeAndSortLocales canonicalizes, deduplicates, and sorts deterministically.
+func NormalizeAndSortLocales(locales []string) []string {
+	result := NormalizeLocales(locales)
+	if len(result) == 0 {
+		return nil
+	}
 	sort.Strings(result)
 	return result
+}
+
+// LocaleParent returns the closest parent locale, if any.
+func LocaleParent(locale string) string {
+	normalized := NormalizeLocale(locale)
+	if normalized == "" {
+		return ""
+	}
+
+	if tag, err := language.Parse(normalized); err == nil {
+		parent := tag.Parent()
+		if parent != language.Und {
+			value := parent.String()
+			if value != "" && value != "und" && strings.HasPrefix(normalized, value+"-") {
+				return value
+			}
+		}
+	}
+
+	if idx := strings.LastIndex(normalized, "-"); idx > 0 {
+		return normalized[:idx]
+	}
+
+	return ""
+}
+
+// LocaleParentChain returns the parent locale chain from nearest parent to root.
+func LocaleParentChain(locale string) []string {
+	normalized := NormalizeLocale(locale)
+	if normalized == "" {
+		return nil
+	}
+
+	chain := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 4)
+
+	for current := LocaleParent(normalized); current != ""; current = LocaleParent(current) {
+		if _, exists := seen[current]; exists {
+			continue
+		}
+		seen[current] = struct{}{}
+		chain = append(chain, current)
+	}
+
+	return chain
+}
+
+func localeParentTag(locale string) string {
+	return LocaleParent(locale)
+}
+
+func localeParentChain(locale string) []string {
+	return LocaleParentChain(locale)
+}
+
+func normalizeLocale(locale string) string {
+	return NormalizeLocale(locale)
+}
+
+func normalizeLocales(locales []string) []string {
+	return NormalizeLocales(locales)
 }
 
 // deriveLocaleParents returns all parent locales for the given locale,
