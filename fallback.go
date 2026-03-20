@@ -51,6 +51,25 @@ func (r *StaticFallbackResolver) Set(locale string, fallbacks ...string) {
 	r.chains[normalizedLocale] = chain
 }
 
+// Has reports whether a locale has an explicitly configured fallback chain,
+// including an intentionally empty chain.
+func (r *StaticFallbackResolver) Has(locale string) bool {
+	if r == nil {
+		return false
+	}
+
+	normalizedLocale := NormalizeLocale(locale)
+	if normalizedLocale == "" {
+		return false
+	}
+
+	r.mu.RLock()
+	_, ok := r.chains[normalizedLocale]
+	r.mu.RUnlock()
+
+	return ok
+}
+
 // Resolve returns a copy of the fallback chain for a locale
 func (r *StaticFallbackResolver) Resolve(locale string) []string {
 	if r == nil {
@@ -63,9 +82,12 @@ func (r *StaticFallbackResolver) Resolve(locale string) []string {
 	}
 
 	r.mu.RLock()
-	chain := r.chains[normalizedLocale]
+	chain, ok := r.chains[normalizedLocale]
 	r.mu.RUnlock()
 
+	if ok && len(chain) == 0 {
+		return []string{}
+	}
 	if len(chain) == 0 {
 		return nil
 	}
