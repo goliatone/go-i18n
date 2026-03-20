@@ -86,9 +86,19 @@
     {
       "name": "regional-parent-chain",
       "input": "es-MX",
-      "parent_expectation": "es",
+      "parent_expectation": "es-419",
       "chain_expectation": [
+        "es-419",
         "es"
+      ]
+    },
+    {
+      "name": "script-parent-chain",
+      "input": "zh-TW",
+      "parent_expectation": "zh-Hant",
+      "chain_expectation": [
+        "zh-Hant",
+        "zh"
       ]
     },
     {
@@ -181,6 +191,7 @@
         "canonical": "es-MX",
         "matched": "es-MX",
         "parents": [
+          "es-419",
           "es"
         ],
         "fallbacks": [],
@@ -209,12 +220,14 @@
         "canonical": "es-MX",
         "matched": "es-MX",
         "parents": [
+          "es-419",
           "es"
         ],
         "fallbacks": [],
         "default": "",
         "chain": [
           "es-MX",
+          "es-419",
           "es"
         ]
       }
