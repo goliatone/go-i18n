@@ -33,4 +33,4 @@ Extending the Example
 ---------------------
 - Add `WithFormatterLocales("el")` after generating Greek bundles to opt in to additional locales.
 - Swap `Registry` for the staging registry composed in `.tmp/examples_integration_test.go` to test regional fallbacks (`es-MX → es`) once promoted.
-- Use `cfg.LocaleCatalog()`, `NormalizeLocale`, and `ResolveLocale` when the host application needs canonical locale selection outside the translator itself.
+- Use `cfg.LocaleCatalog()`, `NormalizeLocale`, `Match`, `MatchAcceptLanguageWithOptions`, and `ResolveLocale` when the host application needs canonical locale selection outside the translator itself.

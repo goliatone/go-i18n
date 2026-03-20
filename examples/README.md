@@ -9,8 +9,10 @@ The `examples` directory hosts runnable snippets that demonstrate how the `i18n`
 The package also exposes shared locale-policy helpers for non-template consumers:
 
 - `NormalizeLocale` and `NormalizeLocales` for canonical request handling
-- `LocaleCatalog.Match` and `MatchAcceptLanguage` for supported-locale selection
-- `ResolveLocale` for explicit locale-chain planning
+- `LocaleCatalog.Match` for route params and other direct supported-locale checks
+- `MatchAcceptLanguage` for convenience header selection across all configured locales
+- `MatchAcceptLanguageWithOptions(..., MatchOptions{Scope: ScopeActiveOnly})` for active-only admin or request-binding flows
+- `ResolveLocale` for explicit locale-chain planning when convenience matching is not enough
 
 ## Running the demo
 

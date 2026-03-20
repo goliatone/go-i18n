@@ -49,7 +49,8 @@ Core helpers:
 Catalog helpers:
 
 - `LocaleCatalog.Match(locale)` resolves a requested locale against the configured catalog using exact-or-parent matching across all locales.
-- `LocaleCatalog.MatchAcceptLanguage(header)` resolves an `Accept-Language` header against the configured catalog.
+- `LocaleCatalog.MatchAcceptLanguage(header)` resolves an `Accept-Language` header across all configured locales as the convenience selection helper.
+- `LocaleCatalog.MatchAcceptLanguageWithOptions(header, MatchOptions)` exposes explicit scoped selection such as active-only `Accept-Language` matching.
 - `LocaleCatalog.DecodeMetadata(locale, out)` decodes generic locale metadata into a caller-owned struct.
 
 Resolution helper:
@@ -58,6 +59,9 @@ Resolution helper:
 
 Conservative defaults matter here:
 
+- `Match` and default `MatchAcceptLanguage` are convenience selection helpers, not full policy engines.
+- They consider all configured locales by default, including inactive ones.
+- Use `MatchAcceptLanguageWithOptions(..., MatchOptions{Scope: ScopeActiveOnly})` when request binding should reject inactive locales.
 - `ResolveLocale` defaults to exact matching.
 - It does not expand parents unless `ExpandParents` is set.
 - It does not expand fallbacks unless `ExpandFallbacks` is set.
@@ -70,7 +74,11 @@ normalized := i18n.NormalizeLocale(" ES_mx ")
 locales := i18n.NormalizeLocales([]string{"es_mx", "es", "ES-MX"})
 
 catalog := cfg.LocaleCatalog()
-matched, _ := catalog.MatchAcceptLanguage("es-MX,es;q=0.9,en;q=0.8")
+routed, _ := catalog.Match("es-MX")
+browser, _ := catalog.MatchAcceptLanguage("es-MX,es;q=0.9,en;q=0.8")
+admin, _ := catalog.MatchAcceptLanguageWithOptions("fr-CA,fr;q=0.9,en;q=0.8", i18n.MatchOptions{
+    Scope: i18n.ScopeActiveOnly,
+})
 
 resolution := i18n.ResolveLocale("es-MX", i18n.ResolveLocaleOptions{
     Catalog:       catalog,
@@ -78,6 +86,10 @@ resolution := i18n.ResolveLocale("es-MX", i18n.ResolveLocaleOptions{
     MatchStrategy: i18n.MatchExact,
     ExpandParents: true,
 })
+
+_ = routed
+_ = browser
+_ = admin
 ```
 
 ## Basic Usage
