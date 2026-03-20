@@ -211,10 +211,7 @@ func formatPhoneWithMetadata(raw string, meta cldrPhoneMetadata) string {
 			break
 		}
 
-		upper := pos + group
-		if upper > len(national) {
-			upper = len(national)
-		}
+		upper := min(pos+group, len(national))
 
 		if i > 0 {
 			builder.WriteString(" ")
