@@ -206,6 +206,49 @@ func TestFormatterRegistryLocaleFallbackResolution(t *testing.T) {
 	}
 }
 
+func TestFormatterRegistryPreservesExplicitEmptyLocaleFallback(t *testing.T) {
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("en-GB")
+
+	registry := NewFormatterRegistry(
+		WithFormatterRegistryResolver(resolver),
+		WithFormatterRegistryLocales("en", "en-GB"),
+	)
+	registry.RegisterLocale("en", "custom_only", func() string {
+		return "fallback"
+	})
+
+	if !resolver.Has("en-GB") {
+		t.Fatal("expected explicit fallback registration for en-GB to be preserved")
+	}
+	if chain := resolver.Resolve("en-GB"); len(chain) != 0 {
+		t.Fatalf("expected explicit empty fallback chain, got %#v", chain)
+	}
+
+	if _, ok := registry.Formatter("custom_only", "en-GB"); ok {
+		t.Fatal("expected no locale fallback when en-GB is explicitly configured with an empty chain")
+	}
+}
+
+func TestEnsureLocaleFallbackPreservesExplicitEmptyChain(t *testing.T) {
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("en-GB")
+
+	registry := NewFormatterRegistry(
+		WithFormatterRegistryResolver(resolver),
+		WithFormatterRegistryLocales("en", "en-GB"),
+	)
+
+	ensureLocaleFallback(registry, "en-GB")
+
+	if !resolver.Has("en-GB") {
+		t.Fatal("expected explicit fallback registration for en-GB to be preserved")
+	}
+	if chain := resolver.Resolve("en-GB"); len(chain) != 0 {
+		t.Fatalf("expected explicit empty fallback chain, got %#v", chain)
+	}
+}
+
 func TestFormatterRegistryFallsBackToDefaults(t *testing.T) {
 	registry := NewFormatterRegistry()
 

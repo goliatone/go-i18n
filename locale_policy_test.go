@@ -42,6 +42,8 @@ type localePolicyFixture struct {
 	AcceptLanguage []struct {
 		Name           string   `json:"name"`
 		CatalogLocales []string `json:"catalog_locales"`
+		Inactive       []string `json:"inactive_locales"`
+		Scope          string   `json:"scope"`
 		Header         string   `json:"header"`
 		Matched        string   `json:"matched_expectation"`
 	} `json:"accept_language"`
@@ -142,15 +144,64 @@ func TestLocaleCatalogMatch_DefaultsToExactOrParentAcrossAllLocales(t *testing.T
 	}
 }
 
+func TestLocaleParentFollowsBCP47NonPrefixParents(t *testing.T) {
+	testCases := []struct {
+		locale string
+		parent string
+		chain  []string
+	}{
+		{locale: "es-MX", parent: "es-419", chain: []string{"es-419", "es"}},
+		{locale: "zh-TW", parent: "zh-Hant", chain: []string{"zh-Hant", "zh"}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.locale, func(t *testing.T) {
+			if got := LocaleParent(tc.locale); got != tc.parent {
+				t.Fatalf("LocaleParent(%q) = %q, want %q", tc.locale, got, tc.parent)
+			}
+			if got := LocaleParentChain(tc.locale); !reflect.DeepEqual(got, tc.chain) {
+				t.Fatalf("LocaleParentChain(%q) = %#v, want %#v", tc.locale, got, tc.chain)
+			}
+		})
+	}
+}
+
+func TestLocaleCatalogMatchPrefersClosestSupportedBCP47Parent(t *testing.T) {
+	catalog := mustBuildCatalog(t, []string{"es", "es-419"}, nil, nil)
+
+	meta, ok := catalog.Match("es-MX")
+	if !ok || meta.Code != "es-419" {
+		t.Fatalf("Match(%q) = %+v,%v, want code %q", "es-MX", meta, ok, "es-419")
+	}
+}
+
 func TestLocalePolicyFixture_AcceptLanguage(t *testing.T) {
 	fixture := loadLocalePolicyFixture(t)
 
 	for _, tc := range fixture.AcceptLanguage {
 		t.Run(tc.Name, func(t *testing.T) {
-			catalog := mustBuildCatalog(t, tc.CatalogLocales, nil, nil)
-			meta, ok := catalog.MatchAcceptLanguage(tc.Header)
+			catalog := mustBuildCatalog(t, tc.CatalogLocales, tc.Inactive, nil)
+
+			var (
+				meta LocaleMetadata
+				ok   bool
+			)
+			if tc.Scope == "" || tc.Scope == "all" {
+				meta, ok = catalog.MatchAcceptLanguage(tc.Header)
+			} else {
+				meta, ok = catalog.MatchAcceptLanguageWithOptions(tc.Header, MatchOptions{
+					Scope: parseLocaleScope(tc.Scope),
+				})
+			}
+
+			if tc.Matched == "" {
+				if ok {
+					t.Fatalf("Accept-Language match(%q) = %+v, expected no match", tc.Header, meta)
+				}
+				return
+			}
 			if !ok || meta.Code != tc.Matched {
-				t.Fatalf("MatchAcceptLanguage(%q) = %+v,%v, want code %q", tc.Header, meta, ok, tc.Matched)
+				t.Fatalf("Accept-Language match(%q) = %+v,%v, want code %q", tc.Header, meta, ok, tc.Matched)
 			}
 		})
 	}
@@ -161,6 +212,32 @@ func TestLocaleCatalogMatchAcceptLanguageMalformedHeader(t *testing.T) {
 
 	if meta, ok := catalog.MatchAcceptLanguage("!!!"); ok {
 		t.Fatalf("MatchAcceptLanguage returned unexpected match: %+v", meta)
+	}
+}
+
+func TestLocaleCatalogMatchAcceptLanguageWithOptionsDefaultsToAllLocales(t *testing.T) {
+	catalog := mustBuildCatalog(t, []string{"en", "fr"}, []string{"fr"}, nil)
+
+	defaultMeta, defaultOK := catalog.MatchAcceptLanguage("fr-CA,fr;q=0.9,en;q=0.8")
+	scopedMeta, scopedOK := catalog.MatchAcceptLanguageWithOptions("fr-CA,fr;q=0.9,en;q=0.8", MatchOptions{})
+
+	if defaultOK != scopedOK || defaultMeta.Code != scopedMeta.Code {
+		t.Fatalf("MatchAcceptLanguageWithOptions zero value = %+v,%v, want %+v,%v", scopedMeta, scopedOK, defaultMeta, defaultOK)
+	}
+}
+
+func TestLocaleCatalogMatchAcceptLanguageDeterministicAcrossCatalogOrder(t *testing.T) {
+	header := "en"
+	first := mustBuildCatalog(t, []string{"en-US", "en-GB"}, nil, nil)
+	second := mustBuildCatalog(t, []string{"en-GB", "en-US"}, nil, nil)
+
+	firstMeta, firstOK := first.MatchAcceptLanguage(header)
+	secondMeta, secondOK := second.MatchAcceptLanguage(header)
+	if !firstOK || !secondOK {
+		t.Fatalf("MatchAcceptLanguage(%q) did not return matches for both catalogs", header)
+	}
+	if firstMeta.Code != secondMeta.Code {
+		t.Fatalf("MatchAcceptLanguage(%q) unstable across catalog order: %q vs %q", header, firstMeta.Code, secondMeta.Code)
 	}
 }
 
@@ -312,6 +389,38 @@ func TestDecodeMetadataErrors(t *testing.T) {
 	var out wrongShape
 	if err := catalog.DecodeMetadata("en-US", &out); err == nil {
 		t.Fatal("expected error for incompatible target field type")
+	}
+}
+
+func TestDecodeMetadataReplacesExistingOutputValues(t *testing.T) {
+	catalog := mustBuildCatalog(t, []string{"en", "es"}, nil, map[string]map[string]any{
+		"en": {
+			"enabled":  true,
+			"analyzer": "english",
+		},
+		"es": {
+			"enabled": true,
+		},
+	})
+
+	type decodeTarget struct {
+		Enabled  bool   `json:"enabled"`
+		Analyzer string `json:"analyzer"`
+	}
+
+	var out decodeTarget
+	if err := catalog.DecodeMetadata("en", &out); err != nil {
+		t.Fatalf("DecodeMetadata(%q): %v", "en", err)
+	}
+	if out.Analyzer != "english" {
+		t.Fatalf("Analyzer after en decode = %q, want %q", out.Analyzer, "english")
+	}
+
+	if err := catalog.DecodeMetadata("es", &out); err != nil {
+		t.Fatalf("DecodeMetadata(%q): %v", "es", err)
+	}
+	if out.Analyzer != "" {
+		t.Fatalf("Analyzer after es decode = %q, want empty string", out.Analyzer)
 	}
 }
 

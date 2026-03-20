@@ -262,6 +262,41 @@ func TestEnablePluralizationSeedsParentFallbacksWhenOptedIn(t *testing.T) {
 	}
 }
 
+func TestEnablePluralizationPreservesExplicitEmptyFallbacksWhenOptedIn(t *testing.T) {
+	rulePath := filepath.Join("testdata", "cldr_cardinal.json")
+	loader := NewFileLoader(filepath.Join("testdata", "loader_en.json"))
+
+	cfg, err := NewConfig(
+		WithLoader(loader),
+		WithLocales("en-US", "en"),
+		WithDefaultLocale("en-US"),
+		WithFallback("en-US"),
+		EnablePluralization(rulePath),
+		EnablePluralFallbackSeeding(),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	if _, err := cfg.BuildTranslator(); err != nil {
+		t.Fatalf("BuildTranslator: %v", err)
+	}
+
+	resolver, ok := cfg.Resolver.(*StaticFallbackResolver)
+	if !ok {
+		t.Fatalf("expected StaticFallbackResolver, got %[1]T", cfg.Resolver)
+	}
+
+	if !resolver.Has("en-US") {
+		t.Fatal("expected explicit fallback registration for en-US to be preserved")
+	}
+
+	chain := resolver.Resolve("en-US")
+	if len(chain) != 0 {
+		t.Fatalf("expected explicit empty fallback chain, got %#v", chain)
+	}
+}
+
 func TestConfig_CultureService(t *testing.T) {
 	// Create test culture data file
 	tmpDir := t.TempDir()
@@ -592,6 +627,52 @@ func TestConfig_LocaleCatalogValidation(t *testing.T) {
 		WithCultureData(cultureFile),
 	); err == nil {
 		t.Fatal("expected error due to undefined fallback locale, got nil")
+	}
+}
+
+func TestConfigApplyCatalogFallbacksPreservesExplicitEmptyFallbacks(t *testing.T) {
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"default_locale": "en",
+		"locales": {
+			"en": {
+				"display_name": "English",
+				"active": true
+			},
+			"es": {
+				"display_name": "Español",
+				"active": true,
+				"fallbacks": ["en"]
+			}
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithCultureData(cultureFile),
+		WithFallback("es"),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	resolver, ok := cfg.Resolver.(*StaticFallbackResolver)
+	if !ok {
+		t.Fatalf("expected StaticFallbackResolver, got %[1]T", cfg.Resolver)
+	}
+
+	if !resolver.Has("es") {
+		t.Fatal("expected explicit fallback registration for es to be preserved")
+	}
+
+	chain := resolver.Resolve("es")
+	if len(chain) != 0 {
+		t.Fatalf("expected explicit empty fallback chain, got %#v", chain)
 	}
 }
 
