@@ -3,6 +3,7 @@ package i18n
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"sync"
 )
 
@@ -77,9 +78,7 @@ func (c *compositeTypedProvider) FuncMap() map[string]any {
 		return result
 	}
 	for _, provider := range c.providers {
-		for key, value := range provider.FuncMap() {
-			result[key] = value
-		}
+		maps.Copy(result, provider.FuncMap())
 	}
 	return result
 }
@@ -542,7 +541,7 @@ func (r *FormatterRegistry) seedFallbacks() {
 			continue
 		}
 
-		if existing := resolver.Resolve(locale); len(existing) > 0 {
+		if resolver.Has(locale) {
 			continue
 		}
 
@@ -593,12 +592,7 @@ func (r *FormatterRegistry) hasProviderLocked(locale string) bool {
 }
 
 func containsLocale(locales []string, target string) bool {
-	for _, locale := range locales {
-		if locale == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(locales, target)
 }
 
 func cloneFuncMap(source map[string]any) map[string]any {
@@ -607,9 +601,7 @@ func cloneFuncMap(source map[string]any) map[string]any {
 	}
 
 	target := make(map[string]any, len(source))
-	for key, value := range source {
-		target[key] = value
-	}
+	maps.Copy(target, source)
 	return target
 }
 
