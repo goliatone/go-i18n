@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -153,7 +154,7 @@ func buildMessageFromJSON(locale, key string, raw json.RawMessage, source string
 }
 
 func decodeTranslationsYAML(path, input string) (map[string]map[string]Message, error) {
-	var raw map[string]map[string]interface{}
+	var raw map[string]map[string]any
 	if err := yaml.Unmarshal([]byte(input), &raw); err != nil {
 		return nil, fmt.Errorf("yaml parse error: %w", err)
 	}
@@ -186,11 +187,11 @@ func decodeTranslationsYAML(path, input string) (map[string]map[string]Message, 
 	return catalogs, nil
 }
 
-func buildMessageFromYAMLValue(locale, key string, value interface{}, source string) (Message, error) {
+func buildMessageFromYAMLValue(locale, key string, value any, source string) (Message, error) {
 	switch v := value.(type) {
 	case string:
 		return buildMessageFromVariants(locale, key, map[PluralCategory]string{PluralOther: v}, source)
-	case map[string]interface{}:
+	case map[string]any:
 		variants := make(map[PluralCategory]string, len(v))
 		for category, template := range v {
 			cat, err := parsePluralCategory(category)
@@ -307,9 +308,7 @@ func mergeMessageBuckets(dst, src map[string]map[string]Message) {
 				if existing.Variants == nil {
 					existing.Variants = make(map[PluralCategory]MessageVariant)
 				}
-				for category, variant := range message.Variants {
-					existing.Variants[category] = variant
-				}
+				maps.Copy(existing.Variants, message.Variants)
 				existing.MessageMetadata = message.MessageMetadata
 				target[key] = existing
 			} else {
@@ -471,9 +470,7 @@ func buildRuleSet(locale string, raw rawLocaleRules) (*PluralRuleSet, error) {
 }
 
 func mergeRuleSets(dst, src map[string]*PluralRuleSet) {
-	for locale, set := range src {
-		dst[locale] = set
-	}
+	maps.Copy(dst, src)
 }
 
 func parsePluralCategory(raw string) (PluralCategory, error) {
