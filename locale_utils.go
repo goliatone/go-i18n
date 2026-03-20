@@ -69,17 +69,23 @@ func LocaleParent(locale string) string {
 	}
 
 	if tag, err := language.Parse(normalized); err == nil {
-		parent := tag.Parent()
-		if parent != language.Und {
-			value := parent.String()
-			if value != "" && value != "und" && strings.HasPrefix(normalized, value+"-") {
-				return value
+		parentTag := tag.Parent()
+		if parentTag != language.Und {
+			value := parentTag.String()
+			if value != "" && value != "und" {
+				parent := NormalizeLocale(value)
+				if parent != "" && parent != normalized {
+					return parent
+				}
 			}
 		}
 	}
 
 	if idx := strings.LastIndex(normalized, "-"); idx > 0 {
-		return normalized[:idx]
+		parent := NormalizeLocale(normalized[:idx])
+		if parent != "" && parent != normalized {
+			return parent
+		}
 	}
 
 	return ""
@@ -97,7 +103,7 @@ func LocaleParentChain(locale string) []string {
 
 	for current := LocaleParent(normalized); current != ""; current = LocaleParent(current) {
 		if _, exists := seen[current]; exists {
-			continue
+			break
 		}
 		seen[current] = struct{}{}
 		chain = append(chain, current)
