@@ -148,7 +148,7 @@ func NewSimpleTranslator(store Store, opts ...SimpleTranslatorOption) (*SimpleTr
 
 func WithTranslatorDefaultLocale(locale string) SimpleTranslatorOption {
 	return func(st *SimpleTranslator) {
-		st.defaultLocale = locale
+		st.defaultLocale = NormalizeLocale(locale)
 	}
 }
 
@@ -191,6 +191,7 @@ func (t *SimpleTranslator) TranslateWithMetadata(locale, key string, args ...any
 	if primary == "" {
 		primary = t.defaultLocale
 	}
+	primary = NormalizeLocale(primary)
 
 	if primary == "" {
 		return "", nil, ErrMissingTranslation
@@ -229,6 +230,7 @@ func (t *SimpleTranslator) TranslateWithMetadata(locale, key string, args ...any
 }
 
 func (t *SimpleTranslator) lookupLocales(primary string) []string {
+	primary = NormalizeLocale(primary)
 	order := make([]string, 0, 4)
 	seen := make(map[string]struct{}, 4)
 
@@ -332,6 +334,7 @@ func (t *SimpleTranslator) resolvePluralCategory(locale string, message Message,
 }
 
 func (t *SimpleTranslator) ruleSetFor(locale string) *PluralRuleSet {
+	locale = NormalizeLocale(locale)
 	if t == nil || locale == "" {
 		return nil
 	}
