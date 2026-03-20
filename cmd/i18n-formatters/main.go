@@ -67,8 +67,8 @@ func (f *localeFlag) String() string {
 }
 
 func (f *localeFlag) Set(value string) error {
-	parts := strings.Split(value, ",")
-	for _, part := range parts {
+	parts := strings.SplitSeq(value, ",")
+	for part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
