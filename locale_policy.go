@@ -17,6 +17,11 @@ const (
 	ScopeActiveOnly
 )
 
+// MatchOptions configures scoped supported-locale selection helpers.
+type MatchOptions struct {
+	Scope LocaleScope
+}
+
 // ResolveLocaleOptions configures deterministic locale resolution.
 type ResolveLocaleOptions struct {
 	Catalog         *LocaleCatalog
