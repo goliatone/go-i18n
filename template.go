@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 )
@@ -266,9 +267,7 @@ func cloneStringKeyMap(input map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	clone := make(map[string]any, len(input))
-	for k, v := range input {
-		clone[k] = v
-	}
+	maps.Copy(clone, input)
 	return clone
 }
 
@@ -400,10 +399,11 @@ type languageFallbackResolver struct {
 }
 
 func newLanguageFallbackResolver(defaultLocale string) *languageFallbackResolver {
-	return &languageFallbackResolver{defaultLocale: defaultLocale}
+	return &languageFallbackResolver{defaultLocale: NormalizeLocale(defaultLocale)}
 }
 
 func (r *languageFallbackResolver) Resolve(locale string) []string {
+	locale = NormalizeLocale(locale)
 	if locale == "" {
 		return nil
 	}
