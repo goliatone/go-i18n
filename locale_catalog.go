@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	"golang.org/x/text/language"
 )
@@ -38,6 +39,30 @@ type LocaleMetadata struct {
 	Active      bool
 	Fallbacks   []string
 	Metadata    map[string]any
+}
+
+// NewLocaleCatalogFromLocales builds a catalog from an explicit locale set and
+// marks each supplied locale active. This is useful for request-bound matching
+// against a caller-owned active locale list.
+func NewLocaleCatalogFromLocales(defaultLocale string, locales []string) (*LocaleCatalog, error) {
+	normalized := NormalizeLocales(locales)
+	if len(normalized) == 0 {
+		return nil, nil
+	}
+	defaultLocale = NormalizeLocale(defaultLocale)
+	if defaultLocale == "" {
+		defaultLocale = normalized[0]
+	}
+
+	active := true
+	definitions := make(map[string]LocaleDefinition, len(normalized))
+	for _, locale := range normalized {
+		definitions[locale] = LocaleDefinition{
+			DisplayName: locale,
+			Active:      &active,
+		}
+	}
+	return newLocaleCatalog(defaultLocale, definitions)
 }
 
 func newLocaleCatalog(defaultLocale string, definitions map[string]LocaleDefinition) (*LocaleCatalog, error) {
@@ -316,6 +341,7 @@ func (c *LocaleCatalog) matchAcceptLanguageWithOptions(header string, scope Loca
 		return LocaleMetadata{}, false
 	}
 
+	header = normalizeAcceptLanguageHeader(header)
 	tags, _, err := language.ParseAcceptLanguage(header)
 	if err != nil || len(tags) == 0 {
 		return LocaleMetadata{}, false
@@ -332,6 +358,38 @@ func (c *LocaleCatalog) matchAcceptLanguageWithOptions(header string, scope Loca
 	}
 
 	return c.Locale(state.codes[index])
+}
+
+func normalizeAcceptLanguageHeader(header string) string {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return ""
+	}
+
+	parts := strings.Split(header, ",")
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		segments := strings.SplitN(part, ";", 2)
+		tag := strings.TrimSpace(segments[0])
+		switch {
+		case tag == "*":
+		case tag != "":
+			if canonical := NormalizeLocale(tag); canonical != "" {
+				tag = canonical
+			}
+		}
+		if len(segments) == 1 {
+			normalized = append(normalized, tag)
+			continue
+		}
+		normalized = append(normalized, tag+";"+strings.TrimSpace(segments[1]))
+	}
+	return strings.Join(normalized, ",")
 }
 
 func (c *LocaleCatalog) matchBestFit(locale string, scope LocaleScope) (LocaleMetadata, bool) {

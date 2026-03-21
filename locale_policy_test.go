@@ -215,6 +215,34 @@ func TestLocaleCatalogMatchAcceptLanguageMalformedHeader(t *testing.T) {
 	}
 }
 
+func TestLocaleCatalogMatchAcceptLanguageNormalizesUnderscoreTags(t *testing.T) {
+	catalog := mustBuildCatalog(t, []string{"en", "es-MX"}, nil, nil)
+
+	meta, ok := catalog.MatchAcceptLanguageWithOptions(" ES_mx ; q=0.9, en;q=0.8 ", MatchOptions{
+		Scope: ScopeActiveOnly,
+	})
+	if !ok || meta.Code != "es-MX" {
+		t.Fatalf("MatchAcceptLanguageWithOptions returned %+v,%v, want code %q", meta, ok, "es-MX")
+	}
+}
+
+func TestNewLocaleCatalogFromLocalesBuildsActiveScopedCatalog(t *testing.T) {
+	catalog, err := NewLocaleCatalogFromLocales("en", []string{"en", "ES_mx"})
+	if err != nil {
+		t.Fatalf("NewLocaleCatalogFromLocales returned error: %v", err)
+	}
+	if catalog == nil {
+		t.Fatalf("expected non-nil catalog")
+	}
+
+	meta, ok := catalog.MatchAcceptLanguageWithOptions("ES_mx,es;q=0.9", MatchOptions{
+		Scope: ScopeActiveOnly,
+	})
+	if !ok || meta.Code != "es-MX" {
+		t.Fatalf("MatchAcceptLanguageWithOptions returned %+v,%v, want code %q", meta, ok, "es-MX")
+	}
+}
+
 func TestLocaleCatalogMatchAcceptLanguageWithOptionsDefaultsToAllLocales(t *testing.T) {
 	catalog := mustBuildCatalog(t, []string{"en", "fr"}, []string{"fr"}, nil)
 
