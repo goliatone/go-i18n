@@ -1,5 +1,25 @@
 # Changelog
 
+# [0.5.0](https://github.com/goliatone/go-i18n/compare/v0.4.0...v0.5.0) - (2026-03-21)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Plural rule files normalzie locale identifiers ([56b3697](https://github.com/goliatone/go-i18n/commit/56b36971674b9671f1ad4b3d6f9c712c32a1f6a8))  - (goliatone)
+- Data boundary issues in loaders and culture ([cd176ca](https://github.com/goliatone/go-i18n/commit/cd176cafd3c7304725168d019bf5781e69d137ce))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.5.0 ([043532f](https://github.com/goliatone/go-i18n/commit/043532ff1c2975c69d0823876ad378b6db2d381a))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.4.0 ([9342170](https://github.com/goliatone/go-i18n/commit/9342170f7c59fe6f0779aa1dd69755ac5018682e))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update tests ([e2ea069](https://github.com/goliatone/go-i18n/commit/e2ea0690caff47ac620d18ce1c7536642aca2013))  - (goliatone)
+- Update examples ([5f4b5fa](https://github.com/goliatone/go-i18n/commit/5f4b5fa68b0a0e2e368d4c555c6e0cfa34f52e1c))  - (goliatone)
+
 # [0.4.0](https://github.com/goliatone/go-i18n/compare/v0.3.0...v0.4.0) - (2026-03-21)
 
 ## <!-- 13 -->📦 Bumps
