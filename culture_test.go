@@ -264,6 +264,26 @@ func TestCultureService_GetMeasurementPreference(t *testing.T) {
 	}
 }
 
+func TestCultureService_NilDataReturnsErrorsInsteadOfPanicking(t *testing.T) {
+	service := NewCultureService(nil, nil)
+
+	if _, err := service.GetCurrency("en"); err == nil {
+		t.Fatal("GetCurrency expected error")
+	}
+	if _, err := service.GetSupportNumber("en"); err == nil {
+		t.Fatal("GetSupportNumber expected error")
+	}
+	if _, err := service.GetList("en", "trending_products"); err == nil {
+		t.Fatal("GetList expected error")
+	}
+	if _, err := service.GetMeasurementPreference("en", "weight"); err == nil {
+		t.Fatal("GetMeasurementPreference expected error")
+	}
+	if _, _, _, err := service.ConvertMeasurement("en", 1, "kg", "weight"); err == nil {
+		t.Fatal("ConvertMeasurement expected error")
+	}
+}
+
 func TestCultureService_GetMeasurementPreference_DefaultPrecedesFallback(t *testing.T) {
 	loader := NewCultureDataLoader(filepath.Join("testdata", "culture", "example_culture_data.json"))
 	data, err := loader.Load()

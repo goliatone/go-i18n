@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -56,6 +57,67 @@ func TestFileLoaderUnsupportedExtension(t *testing.T) {
 
 	if _, err := loader.Load(); err == nil {
 		t.Fatal("expected error for unsupported extension")
+	}
+}
+
+func TestFileLoaderNormalizesLocaleKeysAcrossTranslationsAndRules(t *testing.T) {
+	tmpDir := t.TempDir()
+	translationsPath := filepath.Join(tmpDir, "translations.json")
+	rulesPath := filepath.Join(tmpDir, "rules.json")
+
+	translations := []byte(`{
+		"ES_mx": {
+			"cart.items": {
+				"one": "Tienes {count} artículo",
+				"other": "Tienes {count} artículos"
+			}
+		}
+	}`)
+
+	rules := []byte(`{
+		"locales": {
+			"es-MX": {
+				"name": "Spanish (Mexico)",
+				"cardinal": {
+					"one": [[
+						{"operand":"i","operator":"eq","values":[1]},
+						{"operand":"v","operator":"eq","values":[0]}
+					]]
+				}
+			}
+		}
+	}`)
+
+	if err := os.WriteFile(translationsPath, translations, 0o600); err != nil {
+		t.Fatalf("write translations: %v", err)
+	}
+	if err := os.WriteFile(rulesPath, rules, 0o600); err != nil {
+		t.Fatalf("write rules: %v", err)
+	}
+
+	loader := NewFileLoader(translationsPath).WithPluralRuleFiles(rulesPath)
+
+	data, err := loader.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	store := NewStaticStore(data)
+	if _, ok := store.Rules("es-MX"); !ok {
+		t.Fatal("expected normalized plural rules for es-MX")
+	}
+
+	translator, err := NewSimpleTranslator(store)
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	got, err := translator.Translate("es-MX", "cart.items", WithCount(1))
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+	if got != "Tienes 1 artículo" {
+		t.Fatalf("Translate() = %q, want %q", got, "Tienes 1 artículo")
 	}
 }
 

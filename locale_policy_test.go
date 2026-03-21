@@ -269,6 +269,27 @@ func TestLocaleCatalogMatchAcceptLanguageDeterministicAcrossCatalogOrder(t *test
 	}
 }
 
+func TestResolveLocaleExpandsParentsOfFallbackLocales(t *testing.T) {
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("fr-CA", "es-MX")
+
+	resolution := ResolveLocale("fr-CA", ResolveLocaleOptions{
+		Resolver:        resolver,
+		ExpandParents:   true,
+		ExpandFallbacks: true,
+	})
+
+	expectedFallbacks := []string{"es-MX", "es-419", "es"}
+	if !reflect.DeepEqual(resolution.Fallbacks, expectedFallbacks) {
+		t.Fatalf("Fallbacks = %#v, want %#v", resolution.Fallbacks, expectedFallbacks)
+	}
+
+	expectedChain := []string{"fr-CA", "fr", "es-MX", "es-419", "es"}
+	if !reflect.DeepEqual(resolution.Chain, expectedChain) {
+		t.Fatalf("Chain = %#v, want %#v", resolution.Chain, expectedChain)
+	}
+}
+
 func TestLocalePolicyFixture_ResolveLocale(t *testing.T) {
 	fixture := loadLocalePolicyFixture(t)
 

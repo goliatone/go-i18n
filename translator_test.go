@@ -270,3 +270,28 @@ func TestSimpleTranslatorFallbackMiss(t *testing.T) {
 		t.Fatalf("expected ErrMissingTranslation, got %v", err)
 	}
 }
+
+func TestSimpleTranslatorFallbackExpandsParentsOfFallbackLocales(t *testing.T) {
+	store := NewStaticStore(Translations{
+		"es": newStringCatalog("es", map[string]string{"home.title": "Hola"}),
+	})
+
+	resolver := NewStaticFallbackResolver()
+	resolver.Set("fr-CA", "es-MX")
+
+	translator, err := NewSimpleTranslator(store,
+		WithTranslatorFallbackResolver(resolver),
+	)
+	if err != nil {
+		t.Fatalf("NewSimpleTranslator: %v", err)
+	}
+
+	got, err := translator.Translate("fr-CA", "home.title")
+	if err != nil {
+		t.Fatalf("Translate: %v", err)
+	}
+
+	if got != "Hola" {
+		t.Fatalf("Translate() = %q want Hola", got)
+	}
+}

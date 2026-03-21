@@ -396,6 +396,121 @@ func TestConfig_CultureServiceWithOverride(t *testing.T) {
 	}
 }
 
+func TestConfig_CultureServiceWithOverrideIsScopedToRequestedLocale(t *testing.T) {
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+	overrideFile := filepath.Join(tmpDir, "override.json")
+
+	cultureData := `{
+		"currencies": {
+			"en": { "code": "USD", "symbol": "$" },
+			"es": { "code": "EUR", "symbol": "€" }
+		}
+	}`
+
+	overrideData := `{
+		"currencies": {
+			"es": { "code": "MXN", "symbol": "$" }
+		},
+		"support_numbers": {
+			"es": "+52 55 1234 5678"
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+	if err := writeTestFile(overrideFile, []byte(overrideData)); err != nil {
+		t.Fatalf("write override file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithLocales("en", "es"),
+		WithCultureData(cultureFile),
+		WithCultureOverride("en", overrideFile),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	service := cfg.CultureService()
+	if service == nil {
+		t.Fatal("CultureService() returned nil")
+	}
+
+	currency, err := service.GetCurrencyCode("en")
+	if err != nil {
+		t.Fatalf("GetCurrencyCode(en): %v", err)
+	}
+	if currency != "USD" {
+		t.Fatalf("GetCurrencyCode(en) = %q; want USD", currency)
+	}
+
+	currency, err = service.GetCurrencyCode("es")
+	if err != nil {
+		t.Fatalf("GetCurrencyCode(es): %v", err)
+	}
+	if currency != "EUR" {
+		t.Fatalf("GetCurrencyCode(es) = %q; want EUR", currency)
+	}
+
+	if _, err := service.GetSupportNumber("en"); err == nil {
+		t.Fatal("GetSupportNumber(en) expected error")
+	}
+}
+
+func TestConfig_CultureDataNormalizesLocaleKeys(t *testing.T) {
+	tmpDir := t.TempDir()
+	cultureFile := filepath.Join(tmpDir, "culture.json")
+
+	cultureData := `{
+		"currencies": {
+			"ES_mx": { "code": "MXN", "symbol": "$" }
+		},
+		"support_numbers": {
+			"ES_mx": "+52 55 1234 5678"
+		},
+		"measurement_preferences": {
+			"ES_mx": {
+				"weight": { "unit": "kg", "symbol": "kg" }
+			}
+		}
+	}`
+
+	if err := writeTestFile(cultureFile, []byte(cultureData)); err != nil {
+		t.Fatalf("write culture file: %v", err)
+	}
+
+	cfg, err := NewConfig(
+		WithLocales("es-MX"),
+		WithCultureData(cultureFile),
+	)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+
+	service := cfg.CultureService()
+	if service == nil {
+		t.Fatal("CultureService() returned nil")
+	}
+
+	currency, err := service.GetCurrencyCode("es-MX")
+	if err != nil {
+		t.Fatalf("GetCurrencyCode(es-MX): %v", err)
+	}
+	if currency != "MXN" {
+		t.Fatalf("GetCurrencyCode(es-MX) = %q; want MXN", currency)
+	}
+
+	number, err := service.GetSupportNumber("es-MX")
+	if err != nil {
+		t.Fatalf("GetSupportNumber(es-MX): %v", err)
+	}
+	if number != "+52 55 1234 5678" {
+		t.Fatalf("GetSupportNumber(es-MX) = %q; want +52 55 1234 5678", number)
+	}
+}
+
 func TestConfig_TemplateHelpersWithCulture(t *testing.T) {
 	// Create test culture data file
 	tmpDir := t.TempDir()
