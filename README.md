@@ -382,7 +382,7 @@ Custom formatting rules automatically integrate with the formatter registry and 
 - `WithCultureData(path)` - Load culture data and formatting rules from JSON file
 - `WithCultureOverride(locale, path)` - Add locale-specific culture data override
 
-See [`docs/locale_policy_v1.md`](docs/locale_policy_v1.md) for locale-policy migration notes and release details.
+See [`docs/locale_policy_v1.md`](docs/locale_policy_v1.md) for locale-policy migration notes and release details, and [`docs/locale_policy_compatibility_report.md`](docs/locale_policy_compatibility_report.md) for the final compatibility sweep and follow-on adoption notes.
 
 ## Error Handling
 

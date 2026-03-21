@@ -1,7 +1,7 @@
-Basic Formatter + Translator Example (Staging)
-==============================================
+Basic Formatter + Translator Example
+====================================
 
-This staging copy mirrors the `examples/basic` program and outlines the formatter knobs that will ship once the formatter tasks are promoted.
+This document describes the runnable `examples/basic` program and the shipped formatter and locale-policy surfaces it exercises.
 
 Scenario
 --------
@@ -32,5 +32,5 @@ Expect:
 Extending the Example
 ---------------------
 - Add `WithFormatterLocales("el")` after generating Greek bundles to opt in to additional locales.
-- Swap `Registry` for the staging registry composed in `.tmp/examples_integration_test.go` to test regional fallbacks (`es-MX → es`) once promoted.
+- Use a custom registry setup to test regional fallbacks such as `es-MX -> es` when the host application wants formatter overrides beyond the defaults.
 - Use `cfg.LocaleCatalog()`, `NormalizeLocale`, `Match`, `MatchAcceptLanguageWithOptions`, and `ResolveLocale` when the host application needs canonical locale selection outside the translator itself.
