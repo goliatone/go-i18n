@@ -1,5 +1,24 @@
 # Changelog
 
+# [0.4.0](https://github.com/goliatone/go-i18n/compare/v0.3.0...v0.4.0) - (2026-03-21)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.4.0 ([7e1c6f7](https://github.com/goliatone/go-i18n/commit/7e1c6f7c17f1fe545aa714061d3528ba07b37672))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Locale catalogs from code ([dbb07d9](https://github.com/goliatone/go-i18n/commit/dbb07d9b7157f0c6a95952cf94f9c0b5821f749c))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.3.0 ([37f53fc](https://github.com/goliatone/go-i18n/commit/37f53fc8eb938bbb1bac0c99471d91c6dbd68527))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update examples ([3959599](https://github.com/goliatone/go-i18n/commit/3959599bbe391953cac59cbe9655be4b9700864d))  - (goliatone)
+- Update readme ([8893ca9](https://github.com/goliatone/go-i18n/commit/8893ca95dfd4f40824bd4c48fc7ddff021305c9b))  - (goliatone)
+
 # [0.3.0](https://github.com/goliatone/go-i18n/compare/v0.2.0...v0.3.0) - (2026-03-20)
 
 ## <!-- 1 -->🐛 Bug Fixes
