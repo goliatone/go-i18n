@@ -112,6 +112,10 @@ func (s *cultureService) GetCurrencyCode(locale string) (string, error) {
 
 // GetSupportNumber returns the support contact for a locale
 func (s *cultureService) GetSupportNumber(locale string) (string, error) {
+	if s == nil || s.data == nil || s.data.SupportNumbers == nil {
+		return "", fmt.Errorf("no support number for locale %q", locale)
+	}
+
 	candidates := s.resolveCandidates(locale)
 
 	for _, candidate := range candidates {
@@ -125,6 +129,10 @@ func (s *cultureService) GetSupportNumber(locale string) (string, error) {
 
 // GetList returns a locale-specific list by name
 func (s *cultureService) GetList(locale, name string) ([]string, error) {
+	if s == nil || s.data == nil {
+		return nil, fmt.Errorf("no list %q for locale %q", name, locale)
+	}
+
 	if s.data.Lists == nil {
 		return nil, fmt.Errorf("no lists configured")
 	}
@@ -146,6 +154,10 @@ func (s *cultureService) GetList(locale, name string) ([]string, error) {
 
 // GetMeasurementPreference returns preferred units for a locale
 func (s *cultureService) GetMeasurementPreference(locale, measurementType string) (*UnitPreference, error) {
+	if s == nil || s.data == nil {
+		return nil, fmt.Errorf("no measurement preference for %q in locale %q", measurementType, locale)
+	}
+
 	if s.data.MeasurementPreferences == nil {
 		return nil, fmt.Errorf("no measurement preferences configured")
 	}
@@ -165,9 +177,7 @@ func (s *cultureService) GetMeasurementPreference(locale, measurementType string
 		for _, code := range primary {
 			seen[code] = struct{}{}
 		}
-		for _, fallback := range s.resolver.Resolve(locale) {
-			fallbackChain = append(fallbackChain, s.collectLocaleChain(fallback, seen)...)
-		}
+		collectResolverFallbacks(&fallbackChain, seen, s.resolver, locale)
 	}
 
 	if pref := s.selectMeasurementPreference(fallbackChain, measurementType); pref != nil {
@@ -258,33 +268,9 @@ func (s *cultureService) resolveCandidates(locale string) []string {
 
 	seen := make(map[string]struct{}, 4)
 	candidates := make([]string, 0, 4)
-
-	appendLocale := func(value string) {
-		value = NormalizeLocale(value)
-		if value == "" {
-			return
-		}
-		if _, ok := seen[value]; ok {
-			return
-		}
-		seen[value] = struct{}{}
-		candidates = append(candidates, value)
-	}
-
-	appendLocale(locale)
-
-	for _, parent := range localeParentChain(locale) {
-		appendLocale(parent)
-	}
-
-	if s.resolver != nil {
-		for _, fallback := range s.resolver.Resolve(locale) {
-			appendLocale(fallback)
-			for _, parent := range localeParentChain(fallback) {
-				appendLocale(parent)
-			}
-		}
-	}
+	appendLocaleUnique(&candidates, seen, locale)
+	appendLocaleParents(&candidates, seen, locale)
+	collectResolverFallbacks(&candidates, seen, s.resolver, locale)
 
 	return candidates
 }

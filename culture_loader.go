@@ -61,6 +61,10 @@ func (l *CultureDataLoader) Load() (*CultureData, error) {
 
 // AddOverride adds a locale-specific override file
 func (l *CultureDataLoader) AddOverride(locale, path string) {
+	locale = NormalizeLocale(locale)
+	if locale == "" || path == "" {
+		return
+	}
 	l.overrides[locale] = path
 }
 
@@ -83,6 +87,10 @@ func mergeCultureDataInto(dest, source *CultureData) {
 			dest.Locales = make(map[string]LocaleDefinition, len(source.Locales))
 		}
 		for code, definition := range source.Locales {
+			code = NormalizeLocale(code)
+			if code == "" {
+				continue
+			}
 			existing, ok := dest.Locales[code]
 			if !ok {
 				dest.Locales[code] = cloneLocaleDefinition(definition)
@@ -96,14 +104,26 @@ func mergeCultureDataInto(dest, source *CultureData) {
 		if dest.Currencies == nil {
 			dest.Currencies = make(map[string]CurrencyInfo, len(source.Currencies))
 		}
-		maps.Copy(dest.Currencies, source.Currencies)
+		for locale, currency := range source.Currencies {
+			locale = NormalizeLocale(locale)
+			if locale == "" {
+				continue
+			}
+			dest.Currencies[locale] = currency
+		}
 	}
 
 	if source.SupportNumbers != nil {
 		if dest.SupportNumbers == nil {
 			dest.SupportNumbers = make(map[string]string, len(source.SupportNumbers))
 		}
-		maps.Copy(dest.SupportNumbers, source.SupportNumbers)
+		for locale, number := range source.SupportNumbers {
+			locale = NormalizeLocale(locale)
+			if locale == "" {
+				continue
+			}
+			dest.SupportNumbers[locale] = number
+		}
 	}
 
 	if source.Lists != nil {
@@ -117,7 +137,13 @@ func mergeCultureDataInto(dest, source *CultureData) {
 			if dest.Lists[listName] == nil {
 				dest.Lists[listName] = make(map[string][]string, len(localeMap))
 			}
-			maps.Copy(dest.Lists[listName], localeMap)
+			for locale, entries := range localeMap {
+				locale = NormalizeLocale(locale)
+				if locale == "" {
+					continue
+				}
+				dest.Lists[listName][locale] = cloneStrings(entries)
+			}
 		}
 	}
 
@@ -126,7 +152,8 @@ func mergeCultureDataInto(dest, source *CultureData) {
 			dest.MeasurementPreferences = make(map[string]MeasurementPreferenceSet, len(source.MeasurementPreferences))
 		}
 		for locale, prefs := range source.MeasurementPreferences {
-			if prefs == nil {
+			locale = NormalizeLocale(locale)
+			if locale == "" || prefs == nil {
 				continue
 			}
 			if existing, ok := dest.MeasurementPreferences[locale]; ok && existing != nil {
@@ -141,7 +168,13 @@ func mergeCultureDataInto(dest, source *CultureData) {
 		if dest.FormattingRules == nil {
 			dest.FormattingRules = make(map[string]FormattingRules, len(source.FormattingRules))
 		}
-		maps.Copy(dest.FormattingRules, source.FormattingRules)
+		for locale, rules := range source.FormattingRules {
+			locale = NormalizeLocale(locale)
+			if locale == "" {
+				continue
+			}
+			dest.FormattingRules[locale] = cloneFormattingRules(rules)
+		}
 	}
 }
 
@@ -152,6 +185,11 @@ func (l *CultureDataLoader) mergeCultureData(dest, source *CultureData) {
 
 // loadOverride loads and merges a locale-specific override file
 func (l *CultureDataLoader) loadOverride(base *CultureData, locale, path string) error {
+	locale = NormalizeLocale(locale)
+	if locale == "" {
+		return fmt.Errorf("load culture override: empty locale")
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("load culture override for %q: %w", locale, err)
@@ -162,10 +200,108 @@ func (l *CultureDataLoader) loadOverride(base *CultureData, locale, path string)
 		return fmt.Errorf("parse culture override for %q: %w", locale, err)
 	}
 
-	// Merge override data into base
-	mergeCultureDataInto(base, &override)
+	scoped := scopedCultureOverride(locale, &override)
+	if scoped == nil {
+		return nil
+	}
+
+	mergeCultureDataInto(base, scoped)
 
 	return nil
+}
+
+func scopedCultureOverride(locale string, source *CultureData) *CultureData {
+	locale = NormalizeLocale(locale)
+	if locale == "" || source == nil {
+		return nil
+	}
+
+	override := &CultureData{}
+
+	if definition, ok := lookupLocaleDefinition(source.Locales, locale); ok {
+		override.Locales = map[string]LocaleDefinition{
+			locale: cloneLocaleDefinition(definition),
+		}
+	}
+
+	if currency, ok := lookupNormalizedMapValue(source.Currencies, locale); ok {
+		override.Currencies = map[string]CurrencyInfo{
+			locale: currency,
+		}
+	}
+
+	if number, ok := lookupNormalizedMapValue(source.SupportNumbers, locale); ok {
+		override.SupportNumbers = map[string]string{
+			locale: number,
+		}
+	}
+
+	if len(source.Lists) > 0 {
+		for listName, localeMap := range source.Lists {
+			if entries, ok := lookupNormalizedMapValue(localeMap, locale); ok {
+				if override.Lists == nil {
+					override.Lists = make(map[string]map[string][]string)
+				}
+				override.Lists[listName] = map[string][]string{
+					locale: cloneStrings(entries),
+				}
+			}
+		}
+	}
+
+	if prefs, ok := lookupNormalizedMapValue(source.MeasurementPreferences, locale); ok {
+		override.MeasurementPreferences = map[string]MeasurementPreferenceSet{
+			locale: cloneMeasurementPreferenceSet(prefs),
+		}
+	}
+
+	if rules, ok := lookupNormalizedMapValue(source.FormattingRules, locale); ok {
+		override.FormattingRules = map[string]FormattingRules{
+			locale: cloneFormattingRules(rules),
+		}
+	}
+
+	if len(override.Locales) == 0 &&
+		len(override.Currencies) == 0 &&
+		len(override.SupportNumbers) == 0 &&
+		len(override.Lists) == 0 &&
+		len(override.MeasurementPreferences) == 0 &&
+		len(override.FormattingRules) == 0 {
+		return nil
+	}
+
+	return override
+}
+
+func lookupLocaleDefinition(definitions map[string]LocaleDefinition, locale string) (LocaleDefinition, bool) {
+	if len(definitions) == 0 {
+		return LocaleDefinition{}, false
+	}
+
+	normalized := NormalizeLocale(locale)
+	for code, definition := range definitions {
+		if NormalizeLocale(code) == normalized {
+			return definition, true
+		}
+	}
+
+	return LocaleDefinition{}, false
+}
+
+func lookupNormalizedMapValue[T any](values map[string]T, locale string) (T, bool) {
+	var zero T
+	if len(values) == 0 {
+		return zero, false
+	}
+
+	normalized := NormalizeLocale(locale)
+	for code, value := range values {
+		if NormalizeLocale(code) == normalized {
+			return value, true
+		}
+	}
+
+	return zero, false
 }
 
 func mergeLocaleDefinition(base, override LocaleDefinition) LocaleDefinition {
@@ -290,4 +426,13 @@ func cloneUnitPreference(pref UnitPreference) UnitPreference {
 		maps.Copy(out.ConversionFrom, pref.ConversionFrom)
 	}
 	return out
+}
+
+func cloneFormattingRules(rules FormattingRules) FormattingRules {
+	clone := rules
+	clone.Locale = NormalizeLocale(rules.Locale)
+	if len(rules.MonthNames) > 0 {
+		clone.MonthNames = cloneStrings(rules.MonthNames)
+	}
+	return clone
 }
