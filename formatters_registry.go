@@ -517,15 +517,11 @@ func (r *FormatterRegistry) candidateLocales(locale string) []string {
 		return nil
 	}
 
-	chain := []string{locale}
-	if r.resolver != nil {
-		for _, parent := range r.resolver.Resolve(locale) {
-			if parent == "" || containsLocale(chain, parent) {
-				continue
-			}
-			chain = append(chain, parent)
-		}
-	}
+	chain := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 4)
+
+	appendLocaleUnique(&chain, seen, locale)
+	collectResolverFallbacks(&chain, seen, r.resolver, locale)
 
 	return chain
 }

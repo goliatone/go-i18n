@@ -111,7 +111,12 @@ func decodeTranslationsJSON(path string, data []byte) (map[string]map[string]Mes
 	}
 
 	result := make(map[string]map[string]Message, len(raw))
-	for locale, catalog := range raw {
+	for rawLocale, catalog := range raw {
+		locale, err := normalizeDecodedLocale(rawLocale)
+		if err != nil {
+			return nil, fmt.Errorf("i18n: %w in %s", err, path)
+		}
+
 		if locale == "" {
 			return nil, fmt.Errorf("i18n: empty locale in %s", path)
 		}
@@ -126,7 +131,9 @@ func decodeTranslationsJSON(path string, data []byte) (map[string]map[string]Mes
 			}
 			normalized[key] = message
 		}
-		result[locale] = normalized
+		if err := mergeDecodedMessages(result, locale, normalized); err != nil {
+			return nil, fmt.Errorf("i18n: %w in %s", err, path)
+		}
 	}
 	return result, nil
 }
@@ -164,7 +171,12 @@ func decodeTranslationsYAML(path, input string) (map[string]map[string]Message, 
 	}
 
 	catalogs := make(map[string]map[string]Message, len(raw))
-	for locale, messages := range raw {
+	for rawLocale, messages := range raw {
+		locale, err := normalizeDecodedLocale(rawLocale)
+		if err != nil {
+			return nil, fmt.Errorf("%w in %s", err, path)
+		}
+
 		if locale == "" {
 			return nil, fmt.Errorf("empty locale in %s", path)
 		}
@@ -181,7 +193,9 @@ func decodeTranslationsYAML(path, input string) (map[string]map[string]Message, 
 			}
 			catalog[key] = message
 		}
-		catalogs[locale] = catalog
+		if err := mergeDecodedMessages(catalogs, locale, catalog); err != nil {
+			return nil, fmt.Errorf("%w in %s", err, path)
+		}
 	}
 
 	return catalogs, nil
@@ -379,18 +393,25 @@ func decodePluralRules(path string, data []byte) (map[string]*PluralRuleSet, err
 	}
 
 	result := make(map[string]*PluralRuleSet, len(wrapper.Locales))
-	for locale, rawRules := range wrapper.Locales {
+	for rawLocale, rawRules := range wrapper.Locales {
+		locale, err := normalizeDecodedLocale(rawLocale)
+		if err != nil {
+			return nil, fmt.Errorf("i18n: %w in %s", err, path)
+		}
 		ruleSet, err := buildRuleSet(locale, rawRules)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", locale, err)
 		}
-		result[locale] = ruleSet
+		if err := mergeDecodedRuleSet(result, ruleSet); err != nil {
+			return nil, fmt.Errorf("i18n: %w in %s", err, path)
+		}
 	}
 
 	return result, nil
 }
 
 func buildRuleSet(locale string, raw rawLocaleRules) (*PluralRuleSet, error) {
+	locale = NormalizeLocale(locale)
 	if len(raw.Cardinal) == 0 {
 		return nil, fmt.Errorf("missing cardinal rules")
 	}
@@ -464,9 +485,57 @@ func buildRuleSet(locale string, raw rawLocaleRules) (*PluralRuleSet, error) {
 	return &PluralRuleSet{
 		Locale:      locale,
 		DisplayName: raw.Name,
-		Parent:      raw.Parent,
+		Parent:      NormalizeLocale(raw.Parent),
 		Rules:       entries,
 	}, nil
+}
+
+func normalizeDecodedLocale(locale string) (string, error) {
+	normalized := NormalizeLocale(locale)
+	if normalized == "" {
+		return "", fmt.Errorf("empty locale %q", locale)
+	}
+	return normalized, nil
+}
+
+func mergeDecodedMessages(dst map[string]map[string]Message, locale string, catalog map[string]Message) error {
+	if len(catalog) == 0 {
+		return nil
+	}
+
+	existing := dst[locale]
+	if existing == nil {
+		dst[locale] = catalog
+		return nil
+	}
+
+	for key, message := range catalog {
+		if _, exists := existing[key]; exists {
+			return fmt.Errorf("duplicate message key %q for canonical locale %q", key, locale)
+		}
+		existing[key] = message
+	}
+
+	return nil
+}
+
+func mergeDecodedRuleSet(dst map[string]*PluralRuleSet, ruleSet *PluralRuleSet) error {
+	if ruleSet == nil {
+		return nil
+	}
+
+	locale := NormalizeLocale(ruleSet.Locale)
+	if locale == "" {
+		return fmt.Errorf("empty plural-rule locale %q", ruleSet.Locale)
+	}
+
+	if _, exists := dst[locale]; exists {
+		return fmt.Errorf("duplicate plural rules for canonical locale %q", locale)
+	}
+
+	ruleSet.Locale = locale
+	dst[locale] = ruleSet
+	return nil
 }
 
 func mergeRuleSets(dst, src map[string]*PluralRuleSet) {

@@ -124,6 +124,67 @@ func normalizeLocale(locale string) string {
 	return NormalizeLocale(locale)
 }
 
+func appendLocaleUnique(dst *[]string, seen map[string]struct{}, locale string) bool {
+	locale = NormalizeLocale(locale)
+	if locale == "" {
+		return false
+	}
+
+	if _, exists := seen[locale]; exists {
+		return false
+	}
+
+	seen[locale] = struct{}{}
+	*dst = append(*dst, locale)
+	return true
+}
+
+func appendLocaleParents(dst *[]string, seen map[string]struct{}, locale string) {
+	for _, parent := range LocaleParentChain(locale) {
+		appendLocaleUnique(dst, seen, parent)
+	}
+}
+
+func collectResolverFallbacks(dst *[]string, seen map[string]struct{}, resolver FallbackResolver, seeds ...string) {
+	if resolver == nil {
+		return
+	}
+
+	queue := make([]string, 0, len(seeds))
+	processed := make(map[string]struct{}, len(seeds))
+
+	for _, seed := range seeds {
+		if normalized := NormalizeLocale(seed); normalized != "" {
+			queue = append(queue, normalized)
+		}
+	}
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if _, exists := processed[current]; exists {
+			continue
+		}
+		processed[current] = struct{}{}
+
+		for _, fallback := range resolver.Resolve(current) {
+			fallback = NormalizeLocale(fallback)
+			if fallback == "" {
+				continue
+			}
+
+			appendLocaleUnique(dst, seen, fallback)
+			queue = append(queue, fallback)
+
+			for _, parent := range LocaleParentChain(fallback) {
+				appendLocaleUnique(dst, seen, parent)
+				queue = append(queue, parent)
+			}
+		}
+	}
+}
+
 func normalizeLocales(locales []string) []string {
 	return NormalizeLocales(locales)
 }

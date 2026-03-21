@@ -234,31 +234,10 @@ func (t *SimpleTranslator) lookupLocales(primary string) []string {
 	order := make([]string, 0, 4)
 	seen := make(map[string]struct{}, 4)
 
-	appendLocale := func(locale string) {
-		if locale == "" {
-			return
-		}
-
-		if _, ok := seen[locale]; ok {
-			return
-		}
-		seen[locale] = struct{}{}
-		order = append(order, locale)
-	}
-
-	appendLocale(primary)
-
-	for parent := localeParentTag(primary); parent != ""; parent = localeParentTag(parent) {
-		appendLocale(parent)
-	}
-
-	if t.resolver != nil {
-		for _, fb := range t.resolver.Resolve(primary) {
-			appendLocale(fb)
-		}
-	}
-
-	appendLocale(t.defaultLocale)
+	appendLocaleUnique(&order, seen, primary)
+	appendLocaleParents(&order, seen, primary)
+	collectResolverFallbacks(&order, seen, t.resolver, primary)
+	appendLocaleUnique(&order, seen, t.defaultLocale)
 
 	return order
 }

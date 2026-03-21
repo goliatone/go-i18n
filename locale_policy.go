@@ -114,30 +114,41 @@ func mergeLocaleFallbacks(locale string, catalog *LocaleCatalog, resolver Fallba
 
 	merged := make([]string, 0, 4)
 	seen := map[string]struct{}{locale: {}}
-	appendChain := func(values []string) {
-		for _, value := range values {
-			normalized := NormalizeLocale(value)
-			if normalized == "" {
-				continue
-			}
-			if _, exists := seen[normalized]; exists {
-				continue
-			}
-			seen[normalized] = struct{}{}
-			merged = append(merged, normalized)
-		}
-	}
-
-	if resolver != nil {
-		appendChain(resolver.Resolve(locale))
-	}
-	if catalog != nil {
-		appendChain(catalog.Fallbacks(locale))
-	}
+	collectResolverFallbacks(&merged, seen, chainedFallbackResolver{
+		catalog:  catalog,
+		resolver: resolver,
+	}, locale)
 
 	if len(merged) == 0 {
 		return []string{}
 	}
 
 	return merged
+}
+
+type chainedFallbackResolver struct {
+	catalog  *LocaleCatalog
+	resolver FallbackResolver
+}
+
+func (r chainedFallbackResolver) Resolve(locale string) []string {
+	seen := make(map[string]struct{}, 4)
+	chain := make([]string, 0, 4)
+
+	appendChain := func(values []string) {
+		for _, value := range values {
+			if appendLocaleUnique(&chain, seen, value) {
+				continue
+			}
+		}
+	}
+
+	if r.resolver != nil {
+		appendChain(r.resolver.Resolve(locale))
+	}
+	if r.catalog != nil {
+		appendChain(r.catalog.Fallbacks(locale))
+	}
+
+	return chain
 }
